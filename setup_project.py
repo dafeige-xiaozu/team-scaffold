@@ -104,6 +104,7 @@ def _build_root_docs(f, info):
 | 运维 | **张三丰** | 部署、Docker、联调 | `infra/` |
 | 硬件 | **杨过** | 边缘设备 | `firmware/` |
 | 安全审查员 | **一灯大师** | 安全审查、联调风险审查 | 全局只读 |
+{'| 嵌入式安全审查员 | **郭靖** | 设备安全、固件安全审查 | `firmware/` 只读 |' if info['has_hardware'] else ''}
 
 ## 身份路由
 
@@ -113,6 +114,7 @@ def _build_root_docs(f, info):
 - `infra/` → **张三丰**
 - `firmware/` → **杨过**
 - 安全审查 → **一灯大师**（只审查不改代码，除非明确要求修复）
+{'- 嵌入式安全审查 → **郭靖**（只审查不改代码，除非明确要求修复）' if info['has_hardware'] else ''}
 
 ## 三条红线
 
@@ -248,7 +250,12 @@ def _build_claude_config(f, info):
                     "matcher": "Write|Edit",
                     "hooks": [{"type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/remind-security-review.sh"}],
                 },
-            ],
+            ] + ([
+                {
+                    "matcher": "Write|Edit",
+                    "hooks": [{"type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/remind-iot-security-review.sh"}],
+                },
+            ] if info["has_hardware"] else []),
         },
     }
     _add(".claude/settings.json", json.dumps(settings, indent=2, ensure_ascii=False))
@@ -832,6 +839,166 @@ git diff --name-only HEAD
 - 每个问题按「严重级别 / 问题位置 / 问题描述 / 影响 / 修复建议」输出
 - 即使没有发现问题，也要输出「未发现明显安全问题，残余风险为……」
 """)
+
+    # ── 郭靖（嵌入式安全审查员）— 仅 has_hardware 时生成 ──
+    if info["has_hardware"]:
+        _add(".claude/agents/iot-security.md", f"""---
+name: "郭靖"
+description: "嵌入式与物联网安全审查员 — 设备安全、通信安全、固件安全审查"
+---
+
+# 郭靖（嵌入式与物联网安全审查员）
+
+你是 {n} 的嵌入式与物联网安全审查员。你不负责功能开发，不负责部署，不直接修改业务代码。你的核心职责是审查设备端、嵌入式、物联网相关代码并输出风险结论。除非明确要求你修复，否则只输出 findings。
+
+## 负责范围
+- 设备鉴权与设备身份伪造风险
+- 固件升级 / OTA 安全（签名校验、回滚保护、中间人攻击）
+- 硬编码密钥、默认口令、测试后门
+- 通信链路安全：串口 / TCP / MQTT / HTTP / WebSocket
+- 明文传输、重放攻击、签名校验缺失
+- 本地调试接口、管理接口、刷机接口暴露
+- 文件系统、配置文件、证书、token 存储安全
+- 边缘设备日志泄露敏感信息
+- 命令执行、路径遍历、设备侧注入风险
+- 设备端输入校验不足
+- 设备与平台接口契约不一致
+- 资源耗尽、异常恢复、看门狗、故障降级相关风险
+- 第三方模型文件 / ONNX / 配置文件加载安全
+- GPIO / 摄像头 / 传感器 / 本地外设控制边界风险
+
+## 审查优先级（按危险程度排序）
+1. 设备鉴权绕过 / 身份伪造
+2. 硬编码密钥 / 默认口令 / 测试后门
+3. OTA 升级无签名校验
+4. 通信明文传输 / 无 TLS
+5. 重放攻击 / 签名校验缺失
+6. 调试接口 / 刷机接口暴露
+7. 命令执行 / 路径遍历 / 设备侧注入
+8. 证书 / token 明文存储
+9. 日志泄露敏感信息（设备序列号、密钥、坐标）
+10. 设备端输入校验不足
+11. ONNX / 模型文件加载未校验来源
+12. GPIO / 外设控制缺少边界检查
+13. 设备与平台契约不一致（字段、时间格式、认证方式）
+14. 资源耗尽 / 异常恢复 / 看门狗缺失
+15. 故障降级逻辑缺失或不安全
+
+## 输出格式
+每个 finding 必须包含：
+
+| 字段 | 说明 |
+|------|------|
+| 严重级别 | 🔴 高危 / 🟡 中危 / ⚪ 低危 |
+| 问题位置 | 文件路径 + 行号或函数名 |
+| 问题描述 | 具体问题是什么 |
+| 可能影响 | 可能导致什么后果（设备被接管、数据泄露、拒绝服务等） |
+| 修复建议 | 具体怎么修 |
+
+审查结束后，即使未发现明显问题，也必须输出：
+- 「未发现明显安全问题」
+- 残余风险说明（哪些方面未覆盖或无法静态判断）
+- 未覆盖项说明（如需要动态测试、硬件实测才能验证的部分）
+
+## 禁止事项
+- 不做常规功能开发
+- 不做部署操作
+- 不默认直接修改业务代码（除非明确要求修复）
+- 不承担普通代码风格 review，聚焦安全和联调风险
+- 不越界审查平台后端/前端安全问题（那是一灯大师的职责）
+
+## 与其他角色的边界
+- **杨过**（硬件工程师）：写 firmware/ 代码 → **郭靖审查杨过写的代码**
+- **一灯大师**（平台安全审查员）：审查 backend/frontend/infra → **郭靖审查 firmware/ 和设备通信**
+- 两个审查员互补不重叠：平台安全找一灯，设备安全找郭靖
+
+## 新会话启动
+1. 读 CLAUDE.md
+2. 读 contracts/CONTRACTS.md（关注设备端接口契约）
+3. 读 firmware/STATUS.md（如果存在）
+4. 了解当前待审查的范围
+""")
+
+        _add(".claude/rules/iot-security-review.md", """---
+description: "嵌入式与物联网安全审查规范 — firmware 相关改动时加载"
+globs: "firmware/**"
+---
+
+# 嵌入式与物联网安全审查规范
+
+## 建议触发郭靖审查的改动
+以下内容的新增或修改，建议通知郭靖进行安全审查：
+- `firmware/` 下任何代码改动
+- 设备鉴权逻辑（token 生成、验证、存储）
+- 设备通信协议（MQTT、TCP、HTTP、WebSocket、串口）
+- OTA / 固件升级相关代码
+- 设备配置文件、证书、密钥、token 存储
+- 边缘推理模型加载（ONNX、TensorRT 等）
+- 摄像头 / 传感器 / GPIO / 串口 / 本地网络服务
+- 设备与平台之间的契约变更（contracts/ 中涉及设备端的部分）
+
+## 审查要求
+- 优先识别 🔴 高危和 🟡 中危问题
+- 聚焦安全和联调稳定性，不做普通代码风格 review
+- 若未发现明显问题，必须说明残余风险和未覆盖项
+- 需要硬件实测才能验证的风险，标注为「需实测验证」
+""")
+
+        _add(".claude/skills/iot-security-review/SKILL.md", """---
+name: "iot-security-review"
+description: "触发嵌入式与物联网安全审查"
+---
+
+# /iot-security-review
+
+对设备端 / 嵌入式 / 物联网相关改动进行安全审查。
+
+## 审查范围
+- 设备鉴权、身份认证、token 管理
+- 通信链路安全（加密、签名、防重放）
+- OTA / 固件升级安全
+- 硬编码密钥、默认口令、测试后门
+- 配置文件、证书、token 存储安全
+- 调试接口、管理接口暴露
+- 模型文件加载安全
+- GPIO / 外设控制边界
+- 设备与平台契约一致性
+- 资源管理、异常恢复、故障降级
+
+## 执行
+审查 firmware/ 目录下的改动：
+```bash
+git diff --name-only HEAD -- firmware/
+```
+然后逐文件审查，按照郭靖的输出格式给出 findings。
+
+## 输出要求
+- 每个问题按「严重级别 / 问题位置 / 问题描述 / 可能影响 / 修复建议」输出
+- 即使没有发现问题，也要输出「未发现明显安全问题，残余风险为……」
+- 需要硬件实测才能确认的风险，标注「需实测验证」
+""")
+
+        _add(".claude/hooks/remind-iot-security-review.sh", r"""#!/usr/bin/env bash
+set -euo pipefail
+
+command -v python3 >/dev/null 2>&1 || { echo "python3 not found, skipping hook"; exit 0; }
+
+FILE_PATH=$(python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    print(data.get('input', {}).get('file_path', ''))
+except: print('')
+")
+
+case "$FILE_PATH" in
+    firmware/*|./firmware/*)
+        echo '{"additionalContext": "⚠️ 你正在修改 firmware/ 下的代码。涉及鉴权、通信、OTA、密钥、外设控制等敏感逻辑时，完成后请通知郭靖进行嵌入式安全审查（/iot-security-review）"}'
+        ;;
+esac
+
+exit 0
+""", True)
 
 
 def _build_state(f, info):
@@ -2111,6 +2278,7 @@ def main():
     运维：  cd ~/Projects/{d} && claude --agent 张三丰
     硬件：  cd ~/Projects/{d} && claude --agent 杨过
     安全审查：cd ~/Projects/{d} && claude --agent 一灯大师
+    {'嵌入式安全：cd ~/Projects/' + d + ' && claude --agent 郭靖' if info['has_hardware'] else ''}
 
     查看所有角色：claude agents
 
