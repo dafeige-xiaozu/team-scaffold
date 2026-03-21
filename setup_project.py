@@ -10,9 +10,9 @@
 
 用法：
     cd ~/Projects/新项目目录
-    python ~/Projects/setup_project.py
-    python ~/Projects/setup_project.py --dry-run
-    python ~/Projects/setup_project.py --project-name "我的项目" --desc "一句话描述"
+    python ~/Projects/team-tools/setup_project.py
+    python ~/Projects/team-tools/setup_project.py --dry-run
+    python ~/Projects/team-tools/setup_project.py --project-name "我的项目" --desc "一句话描述"
 """
 import argparse
 import json
