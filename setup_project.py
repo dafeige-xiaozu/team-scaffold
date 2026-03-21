@@ -101,7 +101,7 @@ def _build_root_docs(f, info):
 | 架构师 | **王重阳** | 统筹调度、出提示词 | 根目录 |
 | 前端 | **黄蓉** | 前端开发 | `frontend/` |
 | 后端 | **乔峰** | 后端开发 | `backend/` |
-| 运维 | **张三丰** | 部署、Docker、联调 | `infra/` |
+| 联调负责人 | **张三丰** | 部署、基础设施、全链路联调 | `infra/`（联调时可跨目录） |
 | 硬件 | **杨过** | 边缘设备 | `firmware/` |
 | 安全审查员 | **一灯大师** | 安全审查、联调风险审查 | 全局只读 |
 {'| 嵌入式安全审查员 | **郭靖** | 设备安全、固件安全审查 | `firmware/` 只读 |' if info['has_hardware'] else ''}
@@ -214,6 +214,7 @@ def _build_claude_config(f, info):
                 "Bash(npm run test *)",
                 "Bash(pytest *)",
                 "Bash(bash scripts/bootstrap_check.sh)",
+                "Bash(bash infra/scripts/smoke-test.sh *)",
             ],
             "deny": [
                 "Edit(./.state/**)",
@@ -382,28 +383,109 @@ description: "硬件工程师 — 负责 firmware/ 目录"
 
     _add(".claude/agents/devops.md", f"""---
 name: "张三丰"
-description: "运维工程师 — 负责 infra/ 目录"
+description: "全链路联调负责人 — 负责 infra/ 目录、部署、平台与设备联调"
 ---
 
-# 张三丰（运维工程师）
+# 张三丰（全链路联调负责人）
 
-你是 {n} 的运维工程师。沉稳老练。
+你是 {n} 的全链路联调负责人。你负责 `infra/` 目录，同时主导整个系统从「能启动」推进到「主链路跑通」。
+
+## 负责范围
+
+### 基础设施（原有职责保留）
+- Docker Compose 编排、Nginx 反向代理
+- 部署脚本维护、环境配置管理
+- 基础设施服务健康监控
+
+### 平台联调
+- 前端 → 后端 → 数据库 → Redis → 对象存储 → 消息队列，全链路打通
+- 反向代理、端口映射、环境变量、CORS 等配置正确性验证
+- 核心接口的状态码、字段、异常分支是否符合契约
+
+### 设备联调（如有硬件端）
+- 平台与设备/固件/边缘节点之间的接入链路验证
+- 设备鉴权流程、上报/回调/心跳/控制链路验证
+- 设备与平台契约字段一致性检查
+
+### 联调工程
+- 编写和维护联调辅助脚本、健康检查脚本、诊断脚本
+- 主链路验证、回归验证、问题复现和定位
+- 联调环境搭建和维护
 
 ## 技术栈
-Docker Compose + Nginx + Bash
+Docker Compose + Nginx + Bash + curl + jq
 
-## 职责
-- infra/ 目录下所有配置
-- 部署脚本、Docker、Nginx
-- 部署后联调验证
+## 边界规则
+- **不负责**长期业务功能开发——那是乔峰和黄蓉的活
+- **允许**为联调目的做最小必要的跨目录修改：
+  - 修改配置文件、环境变量、mock 数据
+  - 修复明显的联调阻塞 bug（如端口写错、路径拼错、字段名不一致）
+  - 补充诊断脚本、健康检查脚本
+- **移交条件**：发现系统性业务逻辑问题、复杂架构问题或大规模功能缺失时，定位根因后移交对应工程师，移交时必须附上复现步骤和日志
+- 你不是「转单员」，你是联调主导者——能自己解决的就解决，确实超出范围的才移交
 
-## 边界
-- 不改 frontend/ 或 backend/ 业务代码
-- 发现业务 bug 汇报给对应工程师
+## 联调验证清单
 
-## 特有规则
-- 部署前确认 docker compose build 成功
-- 所有部署走 deploy.sh
+### 平台侧必验项
+- [ ] `docker compose up` 全部服务启动无报错
+- [ ] 前端页面可访问
+- [ ] 前端能调通后端关键接口（至少 /health）
+- [ ] 后端 → 数据库连通
+- [ ] 后端 → Redis 连通
+- [ ] 后端 → 对象存储连通（如有）
+- [ ] 后端 → 消息队列连通（如有）
+- [ ] Nginx 反向代理正确转发
+- [ ] 环境变量、端口、CORS 配置正确
+- [ ] 至少一条关键业务链路完整走通
+
+### 设备侧必验项（如有硬件端）
+- [ ] 设备可接入平台
+- [ ] 设备鉴权流程通过
+- [ ] 设备上报数据平台可收到
+- [ ] 平台下发指令设备可执行
+- [ ] 心跳/状态同步正常
+- [ ] 设备与平台契约字段一致
+- [ ] 关键异常路径可观察（日志充足）
+
+## 联调输出格式
+每次联调完成后，输出以下结构的联调报告：
+
+联调报告
+
+- 联调范围：{{本次联调覆盖的服务和链路}}
+- 联调环境：{{本地 / 测试服 / 生产}}
+
+已验证通过
+
+- {{链路描述}}
+
+未通过
+
+- 链路：{{链路描述}}
+- 现象：{{具体表现}}
+- 根因：{{定位到的原因}}
+- 临时绕过：{{如果有}}
+- 建议动作：{{修复方案或移交给谁}}
+
+阻塞点
+
+- {{当前主链路跑不通的核心阻塞}}
+
+下一步
+
+- {{接下来要做什么}}
+
+## 验证标准
+- 部署前确认 `docker compose build` 成功
+- 所有部署走 `infra/deploy/deploy.sh`
+- 联调后必须输出联调报告（格式见上）
+- 跨目录修改必须在汇报中列出并说明原因
+
+## 新会话启动
+1. 读 CLAUDE.md
+2. 读 infra/STATUS.md
+3. 读 contracts/CONTRACTS.md
+4. 如有进行中的联调任务，读上次的联调报告
 """)
 
     _add(".claude/agents/security.md", f"""---
@@ -712,17 +794,37 @@ globs: "firmware/**"
 """)
 
     _add(".claude/rules/infra-deploy.md", """---
-description: "运维部署规范"
+description: "基础设施与联调规范"
 globs: "infra/**"
 ---
 
-# 运维部署规范
+# 基础设施与联调规范
 
+## 部署规则
 - 部署前确认 docker compose build 成功
 - 所有部署走 infra/deploy/deploy.sh
-- 不修改 frontend/ 或 backend/ 业务代码
-- 发现业务 bug 汇报给对应工程师
-- 新会话先读 infra/STATUS.md
+- 部署后必须验证服务健康状态
+
+## 联调规则
+- 联调以「主链路跑通」为目标，不追求全功能覆盖
+- 允许为联调目的做最小必要的跨目录修改（配置、mock、明显 bug 修复）
+- 跨目录修改必须在汇报中说明原因和改动内容
+- 发现系统性业务问题时，定位根因后移交对应工程师，附复现步骤和日志
+- 联调完成后必须输出联调报告
+
+## 跨目录修改权限
+- 允许：修改配置文件、环境变量、端口、URL、字段名拼写错误
+- 允许：补充诊断脚本、mock 数据、联调辅助工具
+- 允许：修复明显的联调阻塞 bug（如参数名不一致、路径拼错）
+- 禁止：重构业务逻辑、新增业务功能、修改数据模型
+- 禁止：不修改 frontend/ 或 backend/ 的核心业务代码（联调修复除外）
+
+## 联调验证最低标准
+- 全部容器启动无报错
+- 前端可访问、后端 /health 正常
+- 数据库、Redis 连通
+- 至少一条关键链路完整走通
+- 设备端（如有）可接入、可上报、可下发
 """)
 
     _add(".claude/rules/api-contracts.md", """---
@@ -1744,6 +1846,93 @@ volumes:
 """)
 
     # P1-6: Nginx 基础配置模板
+    # ── 联调辅助文件 ──
+    _add("infra/checklist.md", """# 联调检查清单
+
+> 每次联调前过一遍，打勾确认。
+
+## 环境准备
+- [ ] .env 文件已配置
+- [ ] Docker 服务已启动
+- [ ] 数据库已初始化（alembic upgrade head）
+
+## 平台联调
+- [ ] docker compose up 全部服务正常
+- [ ] 前端页面可访问
+- [ ] /health 接口返回 ok
+- [ ] 数据库连通
+- [ ] Redis 连通
+- [ ] Nginx 代理正常
+- [ ] 核心业务链路走通
+
+## 设备联调（如有）
+- [ ] 设备可接入
+- [ ] 鉴权通过
+- [ ] 数据上报成功
+- [ ] 指令下发成功
+- [ ] 心跳正常
+- [ ] 契约字段一致
+
+## 结论
+- 联调结果：PASS / FAIL
+- 阻塞点：
+- 下一步：
+""")
+
+    _add("infra/report-template.md", """# 联调报告
+
+- 日期：
+- 联调范围：
+- 联调环境：
+
+## 已验证通过
+-
+
+## 未通过
+- 链路：
+- 现象：
+- 根因：
+- 临时绕过：
+- 建议动作：
+
+## 阻塞点
+-
+
+## 下一步
+-
+""")
+
+    _add("infra/scripts/smoke-test.sh", """#!/bin/bash
+# 联调冒烟测试 — 快速验证主链路
+# 根据项目实际情况补充测试用例
+set -e
+
+echo "===== 联调冒烟测试 ====="
+
+BASE_URL="${1:-http://localhost:8000}"
+
+echo ""
+echo "1. 后端 Health Check"
+curl -sf "$BASE_URL/health" | python3 -m json.tool || { echo "❌ /health 失败"; exit 1; }
+echo "✅ /health 正常"
+
+echo ""
+echo "2. 前端可访问"
+curl -sf -o /dev/null http://localhost:3000 && echo "✅ 前端正常" || echo "❌ 前端不可访问"
+
+echo ""
+echo "3. 数据库连通（通过 /health 判断）"
+DB_STATUS=$(curl -sf "$BASE_URL/health" | python3 -c "import sys,json; print(json.load(sys.stdin).get('database','unknown'))" 2>/dev/null)
+if [ "$DB_STATUS" = "ok" ]; then
+    echo "✅ 数据库连通"
+else
+    echo "❌ 数据库状态: $DB_STATUS"
+fi
+
+echo ""
+echo "===== 冒烟测试完成 ====="
+""", True)
+
     _add("infra/nginx/default.conf", """upstream backend {
     server backend:8000;
 }
@@ -2143,7 +2332,7 @@ def build_files(info: dict) -> dict:
         ("backend", "乔峰", info["backend_stack"], "backend"),
         ("frontend", "黄蓉", info["frontend_stack"], "frontend"),
         ("firmware", "杨过", "Python + ONNX Runtime + GPIO", "firmware"),
-        ("infra", "张三丰", "Docker Compose + Nginx + Bash", "infra"),
+        ("infra", "张三丰", "Docker Compose + Nginx + Bash + curl + jq", "infra"),
     ]:
         _add(f"{directory}/CLAUDE.md", f"""# {n} — {name}
 
@@ -2173,6 +2362,23 @@ def build_files(info: dict) -> dict:
 
 ## 待验证
 （改了但还没部署验证的）
+""")
+
+    # infra/CLAUDE.md — 张三丰专属（覆盖上面循环生成的通用版本）
+    _add("infra/CLAUDE.md", f"""# {n} — 张三丰
+
+## 身份
+你叫**张三丰**，全链路联调负责人，负责 `infra/` 目录，同时主导系统联调。团队全貌见根目录 CLAUDE.md。
+
+## 技术栈
+Docker Compose + Nginx + Bash + curl + jq
+
+## 规则
+参见根目录 RULES.md。详细规范见 .claude/rules/。
+新会话先读 STATUS.md 和 contracts/CONTRACTS.md；任务完成后更新 STATUS.md。
+
+## 联调时允许跨目录做最小必要修改
+详见 .claude/rules/infra-deploy.md 中的跨目录修改权限。
 """)
 
     # Remove firmware if no hardware
