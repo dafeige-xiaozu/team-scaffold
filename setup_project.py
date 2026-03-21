@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-大飞哥无敌战队 — 项目协作框架初始化脚本 v4
+大飞哥无敌战队 — 项目协作框架初始化脚本 v4.1
 
 生成完整的 Claude Code 项目协作框架：
   agents / hooks / rules / skills / state / contracts / deploy
@@ -13,6 +13,7 @@
     python ~/Projects/team-tools/setup_project.py
     python ~/Projects/team-tools/setup_project.py --dry-run
     python ~/Projects/team-tools/setup_project.py --project-name "我的项目" --desc "一句话描述"
+    python ~/Projects/team-tools/setup_project.py --force  # 覆盖已有文件
 """
 import argparse
 import json
@@ -53,7 +54,7 @@ def collect_info(args) -> dict:
 
     print()
     print("=" * 60)
-    print("  大飞哥无敌战队 — 项目协作框架初始化 v4")
+    print("  大飞哥无敌战队 — 项目协作框架初始化 v4.1")
     print("=" * 60)
     print()
 
@@ -84,17 +85,12 @@ def collect_info(args) -> dict:
 # 文件生成器（按目录分组）
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def build_files(info: dict) -> dict:
-    """Return {relative_path: (content, executable)}."""
-    f = {}
+def _build_root_docs(f, info):
+    """CLAUDE.md、RULES.md、DECISIONS.md 等根目录文档。"""
     _add = lambda p, c, x=False: f.__setitem__(p, (c.strip() + "\n", x))
 
     n = info["project_name"]
-    d = info["dir_name"]
-    ip = info["server_ip"]
-    deploy_path = f"/opt/{d}/" if ip else ""
 
-    # ── Root docs ──────────────────────────────────────────────────────────
     _add("CLAUDE.md", f"""# {n}
 
 ## 团队
@@ -195,10 +191,16 @@ def build_files(info: dict) -> dict:
 （防止跑偏）
 """)
 
-    # ── P3-12: .scaffold-version ───────────────────────────────────────────
-    _add(".scaffold-version", f"v4\ngenerated: {info['date']}\n")
+    _add(".scaffold-version", f"v4.1\ngenerated: {info['date']}\n")
 
-    # ── .claude/settings.json ──────────────────────────────────────────────
+
+def _build_claude_config(f, info):
+    """.claude/ 下的 settings、agents、hooks、rules、skills。"""
+    _add = lambda p, c, x=False: f.__setitem__(p, (c.strip() + "\n", x))
+
+    n = info["project_name"]
+
+    # ── .claude/settings.json ──
     settings = {
         "permissions": {
             "allow": [
@@ -244,7 +246,7 @@ def build_files(info: dict) -> dict:
     }
     _add(".claude/settings.json", json.dumps(settings, indent=2, ensure_ascii=False))
 
-    # ── .claude/agents/ ────────────────────────────────────────────────────
+    # ── .claude/agents/ ──
     _add(".claude/agents/boss.md", f"""---
 name: "大飞哥"
 description: "产品负责人 — 提需求、做决策、分发任务"
@@ -390,7 +392,7 @@ Docker Compose + Nginx + Bash
 - 所有部署走 deploy.sh
 """)
 
-    # ── .claude/hooks/ (P2-8: python3 fallback) ───────────────────────────
+    # ── .claude/hooks/ ──
     _add(".claude/hooks/on-session-start.sh", r"""#!/usr/bin/env bash
 set -euo pipefail
 
@@ -459,6 +461,8 @@ esac
 exit 0
 """, True)
 
+    # P0-3 fix: 去掉 */requirements.txt 通配
+    # P2-11: 彻底去掉 requirements.txt 拦截规则（根目录空文件已删除）
     _add(".claude/hooks/guard-protected-files.sh", r"""#!/usr/bin/env bash
 set -euo pipefail
 
@@ -477,10 +481,6 @@ except: print('')
 case "$FILE_PATH" in
     .state/*|./.state/*)
         echo "BLOCKED: .state/ 目录禁止直接编辑。请用：python scripts/state_cli.py status-set <role> --task '...' --progress '...'" >&2
-        exit 2
-        ;;
-    */requirements.txt|requirements.txt)
-        echo "BLOCKED: requirements.txt 禁止手动编辑。请用：pip freeze > requirements.txt" >&2
         exit 2
         ;;
 esac
@@ -511,7 +511,7 @@ esac
 exit 0
 """, True)
 
-    # ── .claude/rules/ ─────────────────────────────────────────────────────
+    # ── .claude/rules/ ──
     _add(".claude/rules/00-team-protocol.md", """---
 description: "全局协作规范 — 所有角色常驻加载"
 globs: "**"
@@ -633,7 +633,7 @@ globs: "contracts/**"
 - 变更后在汇报里标注需同步哪些角色
 """)
 
-    # ── .claude/skills/ ────────────────────────────────────────────────────
+    # ── .claude/skills/ ──
     _add(".claude/skills/team-status/SKILL.md", """---
 name: "team-status"
 description: "查看全员工作状态"
@@ -684,7 +684,11 @@ python scripts/state_cli.py team-status
 然后读取对应目录的 STATUS.md。
 """)
 
-    # ── .state/ ────────────────────────────────────────────────────────────
+
+def _build_state(f, info):
+    """.state/ 目录。"""
+    _add = lambda p, c, x=False: f.__setitem__(p, (c.strip() + "\n", x))
+
     now = datetime.now(timezone.utc).isoformat()
     decisions_data = [
         {
@@ -706,10 +710,15 @@ python scripts/state_cli.py team-status
     ]
     _add(".state/decisions.json", json.dumps(decisions_data, indent=2, ensure_ascii=False))
     _add(".state/changelog.md", f"# Changelog\n\n## {info['date']}\n- 项目初始化\n")
-    # .state/status/ — empty dir marker
     _add(".state/status/.gitkeep", "")
 
-    # ── contracts/ ─────────────────────────────────────────────────────────
+
+def _build_contracts(f, info):
+    """contracts/ 目录。"""
+    _add = lambda p, c, x=False: f.__setitem__(p, (c.strip() + "\n", x))
+
+    n = info["project_name"]
+
     _add("contracts/CONTRACTS.md", f"""# {n} — API 接口契约
 
 > 任何接口变更必须先更新此文件。
@@ -736,7 +745,754 @@ python scripts/state_cli.py team-status
 # errors: []
 """)
 
-    # ── scripts/state_cli.py (P0-1: atomic_write fix, P0-2: changelog fix, P2-9: fcntl fallback) ──
+
+def _build_backend(f, info):
+    """backend/ 骨架。"""
+    _add = lambda p, c, x=False: f.__setitem__(p, (c.strip() + "\n", x))
+
+    n = info["project_name"]
+
+    # P1-9: backend/__init__.py
+    _add("backend/__init__.py", "")
+
+    _add("backend/main.py", f"""\"\"\"
+{n} — FastAPI 入口
+\"\"\"
+import os
+
+from dotenv import load_dotenv
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+load_dotenv()
+
+app = FastAPI(title="{n}", version="0.1.0")
+
+# CORS
+cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.get("/health")
+async def health():
+    return {{"status": "ok"}}
+""")
+
+    # P0-2: worker.py — Celery 骨架
+    _add("backend/worker.py", """import os
+from celery import Celery
+
+broker = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+app = Celery("worker", broker=broker)
+app.config_from_object({
+    "task_soft_time_limit": 7200,  # 踩坑清单第 4 条
+    "task_time_limit": 7500,
+})
+
+
+@app.task
+def example_task(name: str):
+    return f"Hello {name}"
+""")
+
+    # P1-8: models.py — SQLAlchemy 骨架
+    _add("backend/models.py", """from sqlalchemy import Column, Integer, String, DateTime, func
+from sqlalchemy.orm import DeclarativeBase
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+# 示例模型（按需修改）
+# class User(Base):
+#     __tablename__ = "users"
+#     id = Column(Integer, primary_key=True)
+#     name = Column(String(100), nullable=False)
+#     created_at = Column(DateTime, server_default=func.now())
+""")
+
+    _add("backend/requirements.txt", """fastapi>=0.110,<1.0
+uvicorn[standard]>=0.27,<1.0
+sqlalchemy>=2.0,<3.0
+alembic>=1.13,<2.0
+celery[redis]>=5.3,<6.0
+redis>=5.0,<6.0
+psycopg2-binary>=2.9,<3.0
+python-dotenv>=1.0,<2.0
+pytest>=8.0,<9.0
+httpx>=0.27,<1.0
+""")
+
+    # P0-1 fix: Dockerfile 使用方案 B — context 为项目根目录，COPY 路径明确指向 backend/
+    _add("backend/Dockerfile", """FROM python:3.11-slim
+
+WORKDIR /app
+ENV PYTHONPATH=/app
+
+# 拷贝国内镜像配置
+COPY pip.conf /etc/pip.conf
+
+# 只拷贝 backend 的依赖文件
+COPY backend/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 只拷贝 backend 代码（不会包含 frontend/、.git/ 等）
+COPY backend/ .
+
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+""")
+
+    _add("backend/alembic.ini", """[alembic]
+script_location = alembic
+sqlalchemy.url = sqlite:///./dev.db
+
+[loggers]
+keys = root,sqlalchemy,alembic
+
+[handlers]
+keys = console
+
+[formatters]
+keys = generic
+
+[logger_root]
+level = WARN
+handlers = console
+
+[logger_sqlalchemy]
+level = WARN
+handlers =
+qualname = sqlalchemy.engine
+
+[logger_alembic]
+level = INFO
+handlers =
+qualname = alembic
+
+[handler_console]
+class = StreamHandler
+args = (sys.stderr,)
+level = NOTSET
+formatter = generic
+
+[formatter_generic]
+format = %(levelname)-5.5s [%(name)s] %(message)s
+datefmt = %H:%M:%S
+""")
+
+    # P1-8 fix: alembic env.py 引入 models.Base
+    _add("backend/alembic/env.py", """import os
+from logging.config import fileConfig
+
+from alembic import context
+from sqlalchemy import engine_from_config, pool
+
+config = context.config
+
+if config.config_file_name is not None:
+    fileConfig(config.config_file_name)
+
+# 从环境变量覆盖 sqlalchemy.url
+db_url = os.getenv("DATABASE_URL")
+if db_url:
+    config.set_main_option("sqlalchemy.url", db_url)
+
+from models import Base
+target_metadata = Base.metadata
+
+
+def run_migrations_offline():
+    url = config.get_main_option("sqlalchemy.url")
+    context.configure(url=url, target_metadata=target_metadata, literal_binds=True)
+    with context.begin_transaction():
+        context.run_migrations()
+
+
+def run_migrations_online():
+    connectable = engine_from_config(
+        config.get_section(config.config_ini_section, {}),
+        prefix="sqlalchemy.",
+        poolclass=pool.NullPool,
+    )
+    with connectable.connect() as connection:
+        context.configure(connection=connection, target_metadata=target_metadata)
+        with context.begin_transaction():
+            context.run_migrations()
+
+
+if context.is_offline_mode():
+    run_migrations_offline()
+else:
+    run_migrations_online()
+""")
+
+    _add("backend/alembic/versions/.gitkeep", "")
+
+    _add("backend/alembic/script.py.mako", """\"\"\"${message}
+
+Revision ID: ${up_revision}
+Revises: ${down_revision | comma,n}
+Create Date: ${create_date}
+\"\"\"
+from typing import Sequence, Union
+
+from alembic import op
+import sqlalchemy as sa
+${imports if imports else ""}
+
+revision: str = ${repr(up_revision)}
+down_revision: Union[str, None] = ${repr(down_revision)}
+branch_labels: Union[str, Sequence[str], None] = ${repr(branch_labels)}
+depends_on: Union[str, Sequence[str], None] = ${repr(depends_on)}
+
+
+def upgrade() -> None:
+    ${upgrades if upgrades else "pass"}
+
+
+def downgrade() -> None:
+    ${downgrades if downgrades else "pass"}
+""")
+
+    _add("backend/pyproject.toml", """[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_functions = "test_*"
+asyncio_mode = "auto"
+""")
+
+    _add("backend/conftest.py", """import pytest
+from fastapi.testclient import TestClient
+from main import app
+
+
+@pytest.fixture
+def client():
+    \"\"\"FastAPI 测试客户端。\"\"\"
+    with TestClient(app) as c:
+        yield c
+""")
+
+    # P1-10: backend/tests/__init__.py
+    _add("backend/tests/__init__.py", "")
+
+    _add("backend/tests/test_health.py", """def test_health(client):
+    resp = client.get(\"/health\")
+    assert resp.status_code == 200
+    assert resp.json()[\"status\"] == \"ok\"
+""")
+
+
+def _build_frontend(f, info):
+    """frontend/ 骨架。"""
+    _add = lambda p, c, x=False: f.__setitem__(p, (c.strip() + "\n", x))
+
+    n = info["project_name"]
+    d = info["dir_name"]
+
+    _add("frontend/package.json", json.dumps({
+        "name": d,
+        "version": "0.1.0",
+        "private": True,
+        "scripts": {
+            "dev": "next dev",
+            "build": "next build",
+            "start": "next start",
+            "lint": "next lint",
+            "test": "echo \"no tests yet\" && exit 0",
+        },
+        "dependencies": {
+            "next": "^14",
+            "react": "^18",
+            "react-dom": "^18",
+        },
+        "devDependencies": {
+            "@types/node": "^20",
+            "@types/react": "^18",
+            "@types/react-dom": "^18",
+            "typescript": "^5",
+            "tailwindcss": "^3",
+            "postcss": "^8",
+            "autoprefixer": "^10",
+        },
+    }, indent=2, ensure_ascii=False))
+
+    _add("frontend/tsconfig.json", json.dumps({
+        "compilerOptions": {
+            "target": "es5",
+            "lib": ["dom", "dom.iterable", "esnext"],
+            "allowJs": True,
+            "skipLibCheck": True,
+            "strict": True,
+            "noEmit": True,
+            "esModuleInterop": True,
+            "module": "esnext",
+            "moduleResolution": "bundler",
+            "resolveJsonModule": True,
+            "isolatedModules": True,
+            "jsx": "preserve",
+            "incremental": True,
+            "plugins": [{"name": "next"}],
+            "paths": {"@/*": ["./src/*"]},
+        },
+        "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+        "exclude": ["node_modules"],
+    }, indent=2, ensure_ascii=False))
+
+    _add("frontend/next.config.js", """/** @type {import('next').NextConfig} */
+const nextConfig = {
+  output: "standalone",
+};
+
+module.exports = nextConfig;
+""")
+
+    _add("frontend/Dockerfile", """FROM node:20-alpine AS base
+
+# --- deps ---
+FROM base AS deps
+WORKDIR /app
+COPY package.json package-lock.json* ./
+RUN npm ci || npm install
+
+# --- build ---
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+RUN npm run build
+
+# --- run ---
+FROM base AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/public ./public
+
+EXPOSE 3000
+CMD ["node", "server.js"]
+""")
+
+    _add("frontend/src/lib/api.ts", f"""/**
+ * {n} — API 统一封装
+ *
+ * 所有后端请求都从这里发出，禁止在组件里裸 fetch。
+ */
+
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
+
+interface RequestOptions extends Omit<RequestInit, "body"> {{
+  body?: unknown;
+}}
+
+async function request<T>(path: string, options: RequestOptions = {{}}): Promise<T> {{
+  const {{ body, headers: customHeaders, ...rest }} = options;
+
+  const headers: HeadersInit = {{
+    "Content-Type": "application/json",
+    ...customHeaders,
+  }};
+
+  const res = await fetch(`${{API_BASE}}${{path}}`, {{
+    headers,
+    body: body ? JSON.stringify(body) : undefined,
+    ...rest,
+  }});
+
+  if (!res.ok) {{
+    const err = await res.json().catch(() => ({{ detail: "请求失败" }}));
+    throw new Error(err.detail ?? `HTTP ${{res.status}}`);
+  }}
+
+  return res.json() as Promise<T>;
+}}
+
+export const api = {{
+  get: <T>(path: string) => request<T>(path),
+  post: <T>(path: string, body: unknown) => request<T>(path, {{ method: "POST", body }}),
+  put: <T>(path: string, body: unknown) => request<T>(path, {{ method: "PUT", body }}),
+  del: <T>(path: string) => request<T>(path, {{ method: "DELETE" }}),
+}};
+""")
+
+    # P1-7: 修复 ReactNode import + P1-5: 加 globals.css import
+    _add("frontend/src/app/layout.tsx", f"""import type {{ ReactNode }} from "react";
+import "./globals.css";
+
+export const metadata = {{
+  title: "{n}",
+  description: "{info['project_desc']}",
+}};
+
+export default function RootLayout({{
+  children,
+}}: {{
+  children: ReactNode;
+}}) {{
+  return (
+    <html lang="zh-CN">
+      <body>{{children}}</body>
+    </html>
+  );
+}}
+""")
+
+    _add("frontend/src/app/page.tsx", f"""export default function Home() {{
+  return (
+    <main style={{{{ padding: "2rem" }}}}>
+      <h1>{n}</h1>
+      <p>{info['project_desc']}</p>
+    </main>
+  );
+}}
+""")
+
+    # P1-5: globals.css + Tailwind 配置
+    _add("frontend/src/app/globals.css", """@tailwind base;
+@tailwind components;
+@tailwind utilities;
+""")
+
+    _add("frontend/tailwind.config.js", """/** @type {import('tailwindcss').Config} */
+module.exports = {
+  content: ["./src/**/*.{js,ts,jsx,tsx}"],
+  theme: {
+    extend: {},
+  },
+  plugins: [],
+};
+""")
+
+    _add("frontend/postcss.config.js", """module.exports = {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+};
+""")
+
+
+def _build_infra(f, info):
+    """infra/ + 配置文件。"""
+    _add = lambda p, c, x=False: f.__setitem__(p, (c.strip() + "\n", x))
+
+    n = info["project_name"]
+    d = info["dir_name"]
+    ip = info["server_ip"]
+    deploy_path = f"/opt/{d}/" if ip else ""
+
+    if ip:
+        _add("infra/deploy/deploy.sh", f"""#!/bin/bash
+# 一键部署脚本
+# 注意：需要在服务器上配置 deploy 用户，并设置好 SSH 免密登录
+#   useradd -m deploy && usermod -aG docker deploy
+#   在本地：ssh-copy-id deploy@{ip}
+set -e
+
+DEPLOY_START=$(date +%s)
+TARGET=${{1:-all}}
+SERVER=deploy@{ip}
+DEPLOY_PATH="{deploy_path}"
+
+echo "===== 部署 ====="
+echo "目标: $TARGET"
+
+cd ~/Projects/{d}
+
+# ── 打包 + 本地 md5 ──
+if [ "$TARGET" = "frontend" ] || [ "$TARGET" = "all" ]; then
+    echo "打包前端..."
+    tar czf /tmp/frontend-update.tar.gz --exclude='node_modules' --exclude='.next' --exclude='.git' -C frontend .
+    LOCAL_FE_MD5=$(md5sum /tmp/frontend-update.tar.gz | awk '{{print $1}}')
+    echo "前端包 md5: $LOCAL_FE_MD5"
+fi
+if [ "$TARGET" = "backend" ] || [ "$TARGET" = "all" ]; then
+    echo "打包后端..."
+    tar czf /tmp/backend-update.tar.gz --exclude='__pycache__' --exclude='data' --exclude='*.db' --exclude='*.pt' --exclude='*.onnx' --exclude='.git' -C backend .
+    LOCAL_BE_MD5=$(md5sum /tmp/backend-update.tar.gz | awk '{{print $1}}')
+    echo "后端包 md5: $LOCAL_BE_MD5"
+fi
+
+# ── 上传 ──
+echo "上传..."
+if [ "$TARGET" = "frontend" ]; then
+    scp /tmp/frontend-update.tar.gz $SERVER:/tmp/
+elif [ "$TARGET" = "backend" ]; then
+    scp /tmp/backend-update.tar.gz $SERVER:/tmp/
+else
+    scp /tmp/frontend-update.tar.gz /tmp/backend-update.tar.gz $SERVER:/tmp/
+fi
+
+scp infra/docker/docker-compose.yml $SERVER:${{DEPLOY_PATH}}docker-compose.yml
+scp .env $SERVER:${{DEPLOY_PATH}}.env 2>/dev/null || echo "(本地无 .env，跳过)"
+
+# ── 服务器端部署 ──
+echo "服务器部署..."
+ssh $SERVER "TARGET=$TARGET DEPLOY_PATH=$DEPLOY_PATH LOCAL_FE_MD5=${{LOCAL_FE_MD5:-}} LOCAL_BE_MD5=${{LOCAL_BE_MD5:-}} bash -s" << 'EOF'
+set -e
+
+# md5 校验（踩坑清单第 7 条）
+if [ -n "$LOCAL_FE_MD5" ]; then
+    REMOTE_FE_MD5=$(md5sum /tmp/frontend-update.tar.gz | awk '{{print $1}}')
+    if [ "$LOCAL_FE_MD5" != "$REMOTE_FE_MD5" ]; then
+        echo "ERROR: 前端包 md5 不匹配！本地=$LOCAL_FE_MD5 远程=$REMOTE_FE_MD5" >&2
+        exit 1
+    fi
+    echo "前端包 md5 校验通过"
+fi
+if [ -n "$LOCAL_BE_MD5" ]; then
+    REMOTE_BE_MD5=$(md5sum /tmp/backend-update.tar.gz | awk '{{print $1}}')
+    if [ "$LOCAL_BE_MD5" != "$REMOTE_BE_MD5" ]; then
+        echo "ERROR: 后端包 md5 不匹配！本地=$LOCAL_BE_MD5 远程=$REMOTE_BE_MD5" >&2
+        exit 1
+    fi
+    echo "后端包 md5 校验通过"
+fi
+
+# 备份旧目录（失败时可手动回滚：mv backend.bak.xxx backend）
+TIMESTAMP=$(date +%s)
+if [ "$TARGET" = "frontend" ] || [ "$TARGET" = "all" ]; then
+    if [ -d "${{DEPLOY_PATH}}frontend" ]; then
+        cp -r "${{DEPLOY_PATH}}frontend" "${{DEPLOY_PATH}}frontend.bak.$TIMESTAMP"
+    fi
+    cd ${{DEPLOY_PATH}}frontend && tar xzf /tmp/frontend-update.tar.gz
+fi
+if [ "$TARGET" = "backend" ] || [ "$TARGET" = "all" ]; then
+    if [ -d "${{DEPLOY_PATH}}backend" ]; then
+        cp -r "${{DEPLOY_PATH}}backend" "${{DEPLOY_PATH}}backend.bak.$TIMESTAMP"
+    fi
+    cd ${{DEPLOY_PATH}}backend && tar xzf /tmp/backend-update.tar.gz
+fi
+
+cd $DEPLOY_PATH
+if [ "$TARGET" = "frontend" ]; then
+    docker compose build frontend && docker compose up -d frontend
+elif [ "$TARGET" = "backend" ]; then
+    docker compose build backend celery-worker && docker compose up -d backend celery-worker
+else
+    docker compose build && docker compose up -d
+fi
+
+# 循环探测 health（最多等 60s，每 5s 探测一次）
+echo "等待服务就绪..."
+for i in $(seq 1 12); do
+    if curl -s --max-time 5 http://localhost:8000/health > /dev/null 2>&1; then
+        echo "health 检查通过"
+        break
+    fi
+    if [ "$i" -eq 12 ]; then
+        echo "WARNING: 60s 内 health 未就绪，请手动检查"
+    else
+        sleep 5
+    fi
+done
+
+docker compose ps --format table
+
+# 清理超过 3 天的旧备份
+find $DEPLOY_PATH -maxdepth 1 -name "*.bak.*" -mtime +3 -exec rm -rf {{}} \\;
+EOF
+
+DEPLOY_END=$(date +%s)
+echo ""
+echo "部署完成！耗时 $(((DEPLOY_END - DEPLOY_START) / 60))分$(((DEPLOY_END - DEPLOY_START) % 60))秒"
+""", True)
+
+    # P0-1 fix (方案B): context 保持 ../../，Dockerfile 里 COPY 路径改成 backend/ 前缀
+    # P2-12: postgres 去掉 env_file，只保留 environment 块
+    # P1-6: 加 nginx 服务（注释掉）
+    _add("infra/docker/docker-compose.yml", f"""services:
+  backend:
+    build:
+      context: ../../
+      dockerfile: backend/Dockerfile
+    ports:
+      - "8000:8000"
+    env_file: ../../.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  celery-worker:
+    build:
+      context: ../../
+      dockerfile: backend/Dockerfile
+    command: ["celery", "-A", "worker", "worker", "--loglevel=info", "--concurrency=2"]
+    env_file: ../../.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    stop_grace_period: 120s
+
+  frontend:
+    build:
+      context: ../../frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${{POSTGRES_USER:-app}}
+      POSTGRES_PASSWORD: ${{POSTGRES_PASSWORD:-change-me-in-production}}
+      POSTGRES_DB: ${{POSTGRES_DB:-app_db}}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${{POSTGRES_USER:-app}}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Nginx 反向代理（生产环境取消注释）──
+  # nginx:
+  #   image: nginx:alpine
+  #   ports:
+  #     - "80:80"
+  #   volumes:
+  #     - ../nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+  #   depends_on:
+  #     - backend
+  #     - frontend
+
+volumes:
+  pgdata:
+""")
+
+    # P1-6: Nginx 基础配置模板
+    _add("infra/nginx/default.conf", """upstream backend {
+    server backend:8000;
+}
+upstream frontend {
+    server frontend:3000;
+}
+
+server {
+    listen 80;
+
+    location /api/ {
+        proxy_pass http://backend/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    location / {
+        proxy_pass http://frontend;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+""")
+
+
+def _build_config_files(f, info):
+    """.env.example、.gitignore、.dockerignore、pip.conf 等。"""
+    _add = lambda p, c, x=False: f.__setitem__(p, (c.strip() + "\n", x))
+
+    ip = info["server_ip"]
+
+    _add("pip.conf", "[global]\nindex-url = https://pypi.tuna.tsinghua.edu.cn/simple\ntrusted-host = pypi.tuna.tsinghua.edu.cn\n")
+    _add(".npmrc", "registry=https://registry.npmmirror.com\n")
+
+    # P2-11: 去掉根目录空 requirements.txt（容易和 backend/requirements.txt 混淆）
+
+    env_lines = [
+        "ENV=development", "SECRET_KEY=change-me", "",
+        "DATABASE_URL=sqlite:///./dev.db",
+        "# DATABASE_URL=postgresql://user:pass@localhost:5432/dbname", "",
+        "REDIS_URL=redis://localhost:6379/0",
+        "CORS_ORIGINS=http://localhost:3000", "",
+        "# PostgreSQL (docker-compose 使用)",
+        "POSTGRES_USER=app",
+        "POSTGRES_PASSWORD=change-me-in-production",
+        "POSTGRES_DB=app_db",
+    ]
+    if ip:
+        env_lines.append(f"PLATFORM_BASE_URL=http://{ip}:8000")
+    _add(".env.example", "\n".join(env_lines) + "\n")
+
+    _add(".gitignore", """# Python
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+venv/
+*.db
+
+# Node
+node_modules/
+.next/
+out/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# Env
+.env
+*.env.local
+
+# Data
+data/
+*.pt
+*.onnx
+dump.rdb
+""")
+
+    # P1-4: .dockerignore
+    _add(".dockerignore", """.git
+.state
+node_modules
+.next
+out
+__pycache__
+*.pyc
+*.db
+*.pt
+*.onnx
+.env
+.env.*
+data/
+dump.rdb
+*.tar.gz
+""")
+
+
+def _build_scripts(f, info):
+    """scripts/ 目录。"""
+    _add = lambda p, c, x=False: f.__setitem__(p, (c.strip() + "\n", x))
+
     _add("scripts/state_cli.py", r"""#!/usr/bin/env python3
 """
     + '''"""
@@ -969,7 +1725,28 @@ if __name__ == "__main__":
     main()
 ''')
 
-    # ── Sub-directory CLAUDE.md + STATUS.md ────────────────────────────────
+
+def build_files(info: dict) -> dict:
+    """Return {relative_path: (content, executable)}.
+
+    v4.1: 拆分为多个子函数，主函数只负责调用和 firmware 过滤。
+    """
+    f = {}
+
+    _build_root_docs(f, info)
+    _build_claude_config(f, info)
+    _build_state(f, info)
+    _build_contracts(f, info)
+    _build_scripts(f, info)
+    _build_backend(f, info)
+    _build_frontend(f, info)
+    _build_infra(f, info)
+    _build_config_files(f, info)
+
+    # Sub-directory CLAUDE.md + STATUS.md
+    n = info["project_name"]
+    _add = lambda p, c, x=False: f.__setitem__(p, (c.strip() + "\n", x))
+
     for role, name, stack, directory in [
         ("backend", "乔峰", info["backend_stack"], "backend"),
         ("frontend", "黄蓉", info["frontend_stack"], "frontend"),
@@ -1006,594 +1783,6 @@ if __name__ == "__main__":
 （改了但还没部署验证的）
 """)
 
-    # ── P1-5: 后端骨架代码 ─────────────────────────────────────────────────
-    _add("backend/main.py", f"""\"\"\"
-{n} — FastAPI 入口
-\"\"\"
-import os
-
-from dotenv import load_dotenv
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-
-load_dotenv()
-
-app = FastAPI(title="{n}", version="0.1.0")
-
-# CORS
-cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=cors_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
-@app.get("/health")
-async def health():
-    return {{"status": "ok"}}
-""")
-
-    _add("backend/requirements.txt", """fastapi>=0.110,<1.0
-uvicorn[standard]>=0.27,<1.0
-sqlalchemy>=2.0,<3.0
-alembic>=1.13,<2.0
-celery[redis]>=5.3,<6.0
-redis>=5.0,<6.0
-psycopg2-binary>=2.9,<3.0
-python-dotenv>=1.0,<2.0
-pytest>=8.0,<9.0
-httpx>=0.27,<1.0
-""")
-
-    _add("backend/Dockerfile", """FROM python:3.11-slim
-
-WORKDIR /app
-ENV PYTHONPATH=/app
-
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY . .
-
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
-""")
-
-    _add("backend/alembic.ini", """[alembic]
-script_location = alembic
-sqlalchemy.url = sqlite:///./dev.db
-
-[loggers]
-keys = root,sqlalchemy,alembic
-
-[handlers]
-keys = console
-
-[formatters]
-keys = generic
-
-[logger_root]
-level = WARN
-handlers = console
-
-[logger_sqlalchemy]
-level = WARN
-handlers =
-qualname = sqlalchemy.engine
-
-[logger_alembic]
-level = INFO
-handlers =
-qualname = alembic
-
-[handler_console]
-class = StreamHandler
-args = (sys.stderr,)
-level = NOTSET
-formatter = generic
-
-[formatter_generic]
-format = %(levelname)-5.5s [%(name)s] %(message)s
-datefmt = %H:%M:%S
-""")
-
-    _add("backend/alembic/env.py", """import os
-from logging.config import fileConfig
-
-from alembic import context
-from sqlalchemy import engine_from_config, pool
-
-config = context.config
-
-if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
-
-# 从环境变量覆盖 sqlalchemy.url
-db_url = os.getenv("DATABASE_URL")
-if db_url:
-    config.set_main_option("sqlalchemy.url", db_url)
-
-target_metadata = None
-
-
-def run_migrations_offline():
-    url = config.get_main_option("sqlalchemy.url")
-    context.configure(url=url, target_metadata=target_metadata, literal_binds=True)
-    with context.begin_transaction():
-        context.run_migrations()
-
-
-def run_migrations_online():
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
-    with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata)
-        with context.begin_transaction():
-            context.run_migrations()
-
-
-if context.is_offline_mode():
-    run_migrations_offline()
-else:
-    run_migrations_online()
-""")
-
-    _add("backend/alembic/versions/.gitkeep", "")
-
-    _add("backend/alembic/script.py.mako", """\"\"\"${message}
-
-Revision ID: ${up_revision}
-Revises: ${down_revision | comma,n}
-Create Date: ${create_date}
-\"\"\"
-from typing import Sequence, Union
-
-from alembic import op
-import sqlalchemy as sa
-${imports if imports else ""}
-
-revision: str = ${repr(up_revision)}
-down_revision: Union[str, None] = ${repr(down_revision)}
-branch_labels: Union[str, Sequence[str], None] = ${repr(branch_labels)}
-depends_on: Union[str, Sequence[str], None] = ${repr(depends_on)}
-
-
-def upgrade() -> None:
-    ${upgrades if upgrades else "pass"}
-
-
-def downgrade() -> None:
-    ${downgrades if downgrades else "pass"}
-""")
-
-    _add("backend/pyproject.toml", """[tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = "test_*.py"
-python_functions = "test_*"
-asyncio_mode = "auto"
-""")
-
-    _add("backend/conftest.py", """import pytest
-from fastapi.testclient import TestClient
-from main import app
-
-
-@pytest.fixture
-def client():
-    \"\"\"FastAPI 测试客户端。\"\"\"
-    with TestClient(app) as c:
-        yield c
-""")
-
-    _add("backend/tests/__init__.py", "")
-
-    _add("backend/tests/test_health.py", """def test_health(client):
-    resp = client.get(\"/health\")
-    assert resp.status_code == 200
-    assert resp.json()[\"status\"] == \"ok\"
-""")
-
-    # ── P1-6: 前端骨架代码 ─────────────────────────────────────────────────
-    _add("frontend/package.json", json.dumps({
-        "name": d,
-        "version": "0.1.0",
-        "private": True,
-        "scripts": {
-            "dev": "next dev",
-            "build": "next build",
-            "start": "next start",
-            "lint": "next lint",
-            "test": "echo \"no tests yet\" && exit 0",
-        },
-        "dependencies": {
-            "next": "^14",
-            "react": "^18",
-            "react-dom": "^18",
-        },
-        "devDependencies": {
-            "@types/node": "^20",
-            "@types/react": "^18",
-            "@types/react-dom": "^18",
-            "typescript": "^5",
-            "tailwindcss": "^3",
-            "postcss": "^8",
-            "autoprefixer": "^10",
-        },
-    }, indent=2, ensure_ascii=False))
-
-    _add("frontend/tsconfig.json", json.dumps({
-        "compilerOptions": {
-            "target": "es5",
-            "lib": ["dom", "dom.iterable", "esnext"],
-            "allowJs": True,
-            "skipLibCheck": True,
-            "strict": True,
-            "noEmit": True,
-            "esModuleInterop": True,
-            "module": "esnext",
-            "moduleResolution": "bundler",
-            "resolveJsonModule": True,
-            "isolatedModules": True,
-            "jsx": "preserve",
-            "incremental": True,
-            "plugins": [{"name": "next"}],
-            "paths": {"@/*": ["./src/*"]},
-        },
-        "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-        "exclude": ["node_modules"],
-    }, indent=2, ensure_ascii=False))
-
-    _add("frontend/next.config.js", """/** @type {import('next').NextConfig} */
-const nextConfig = {
-  output: "standalone",
-};
-
-module.exports = nextConfig;
-""")
-
-    _add("frontend/Dockerfile", """FROM node:20-alpine AS base
-
-# --- deps ---
-FROM base AS deps
-WORKDIR /app
-COPY package.json package-lock.json* ./
-RUN npm ci || npm install
-
-# --- build ---
-FROM base AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
-RUN npm run build
-
-# --- run ---
-FROM base AS runner
-WORKDIR /app
-ENV NODE_ENV=production
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/public ./public
-
-EXPOSE 3000
-CMD ["node", "server.js"]
-""")
-
-    _add("frontend/src/lib/api.ts", f"""/**
- * {n} — API 统一封装
- *
- * 所有后端请求都从这里发出，禁止在组件里裸 fetch。
- */
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
-
-interface RequestOptions extends Omit<RequestInit, "body"> {{
-  body?: unknown;
-}}
-
-async function request<T>(path: string, options: RequestOptions = {{}}): Promise<T> {{
-  const {{ body, headers: customHeaders, ...rest }} = options;
-
-  const headers: HeadersInit = {{
-    "Content-Type": "application/json",
-    ...customHeaders,
-  }};
-
-  const res = await fetch(`${{API_BASE}}${{path}}`, {{
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
-    ...rest,
-  }});
-
-  if (!res.ok) {{
-    const err = await res.json().catch(() => ({{ detail: "请求失败" }}));
-    throw new Error(err.detail ?? `HTTP ${{res.status}}`);
-  }}
-
-  return res.json() as Promise<T>;
-}}
-
-export const api = {{
-  get: <T>(path: string) => request<T>(path),
-  post: <T>(path: string, body: unknown) => request<T>(path, {{ method: "POST", body }}),
-  put: <T>(path: string, body: unknown) => request<T>(path, {{ method: "PUT", body }}),
-  del: <T>(path: string) => request<T>(path, {{ method: "DELETE" }}),
-}};
-""")
-
-    _add("frontend/src/app/layout.tsx", f"""export const metadata = {{
-  title: "{n}",
-  description: "{info['project_desc']}",
-}};
-
-export default function RootLayout({{
-  children,
-}}: {{
-  children: React.ReactNode;
-}}) {{
-  return (
-    <html lang="zh-CN">
-      <body>{{children}}</body>
-    </html>
-  );
-}}
-""")
-
-    _add("frontend/src/app/page.tsx", f"""export default function Home() {{
-  return (
-    <main style={{{{ padding: "2rem" }}}}>
-      <h1>{n}</h1>
-      <p>{info['project_desc']}</p>
-    </main>
-  );
-}}
-""")
-
-    # ── Config files ───────────────────────────────────────────────────────
-    _add("pip.conf", "[global]\nindex-url = https://pypi.tuna.tsinghua.edu.cn/simple\ntrusted-host = pypi.tuna.tsinghua.edu.cn\n")
-    _add(".npmrc", "registry=https://registry.npmmirror.com\n")
-    _add("requirements.txt", "")
-
-    env_lines = [
-        "ENV=development", "SECRET_KEY=change-me", "",
-        "DATABASE_URL=sqlite:///./dev.db",
-        "# DATABASE_URL=postgresql://user:pass@localhost:5432/dbname", "",
-        "REDIS_URL=redis://localhost:6379/0",
-        f"CORS_ORIGINS=http://localhost:3000", "",
-        "# PostgreSQL (docker-compose 使用)",
-        "POSTGRES_USER=app",
-        "POSTGRES_PASSWORD=change-me-in-production",
-        "POSTGRES_DB=app_db",
-    ]
-    if ip:
-        env_lines.append(f"PLATFORM_BASE_URL=http://{ip}:8000")
-    _add(".env.example", "\n".join(env_lines) + "\n")
-
-    _add(".gitignore", """# Python
-__pycache__/
-*.pyc
-*.egg-info/
-.venv/
-venv/
-*.db
-
-# Node
-node_modules/
-.next/
-out/
-
-# IDE
-.vscode/
-.idea/
-
-# OS
-.DS_Store
-
-# Env
-.env
-*.env.local
-
-# Data
-data/
-*.pt
-*.onnx
-dump.rdb
-""")
-
-    # ── infra/ ─────────────────────────────────────────────────────────────
-    if ip:
-        # P2-10: deploy.sh 改进 — deploy 用户、health 循环探测、备份、md5 校验
-        _add("infra/deploy/deploy.sh", f"""#!/bin/bash
-# 一键部署脚本
-# 注意：需要在服务器上配置 deploy 用户，并设置好 SSH 免密登录
-#   useradd -m deploy && usermod -aG docker deploy
-#   在本地：ssh-copy-id deploy@{ip}
-set -e
-
-DEPLOY_START=$(date +%s)
-TARGET=${{1:-all}}
-SERVER=deploy@{ip}
-DEPLOY_PATH="{deploy_path}"
-
-echo "===== 部署 ====="
-echo "目标: $TARGET"
-
-cd ~/Projects/{d}
-
-# ── 打包 + 本地 md5 ──
-if [ "$TARGET" = "frontend" ] || [ "$TARGET" = "all" ]; then
-    echo "打包前端..."
-    tar czf /tmp/frontend-update.tar.gz --exclude='node_modules' --exclude='.next' --exclude='.git' -C frontend .
-    LOCAL_FE_MD5=$(md5sum /tmp/frontend-update.tar.gz | awk '{{print $1}}')
-    echo "前端包 md5: $LOCAL_FE_MD5"
-fi
-if [ "$TARGET" = "backend" ] || [ "$TARGET" = "all" ]; then
-    echo "打包后端..."
-    tar czf /tmp/backend-update.tar.gz --exclude='__pycache__' --exclude='data' --exclude='*.db' --exclude='*.pt' --exclude='*.onnx' --exclude='.git' -C backend .
-    LOCAL_BE_MD5=$(md5sum /tmp/backend-update.tar.gz | awk '{{print $1}}')
-    echo "后端包 md5: $LOCAL_BE_MD5"
-fi
-
-# ── 上传 ──
-echo "上传..."
-if [ "$TARGET" = "frontend" ]; then
-    scp /tmp/frontend-update.tar.gz $SERVER:/tmp/
-elif [ "$TARGET" = "backend" ]; then
-    scp /tmp/backend-update.tar.gz $SERVER:/tmp/
-else
-    scp /tmp/frontend-update.tar.gz /tmp/backend-update.tar.gz $SERVER:/tmp/
-fi
-
-scp infra/docker/docker-compose.yml $SERVER:${{DEPLOY_PATH}}docker-compose.yml
-scp .env $SERVER:${{DEPLOY_PATH}}.env 2>/dev/null || echo "(本地无 .env，跳过)"
-
-# ── 服务器端部署 ──
-echo "服务器部署..."
-ssh $SERVER "TARGET=$TARGET DEPLOY_PATH=$DEPLOY_PATH LOCAL_FE_MD5=${{LOCAL_FE_MD5:-}} LOCAL_BE_MD5=${{LOCAL_BE_MD5:-}} bash -s" << 'EOF'
-set -e
-
-# md5 校验（踩坑清单第 7 条）
-if [ -n "$LOCAL_FE_MD5" ]; then
-    REMOTE_FE_MD5=$(md5sum /tmp/frontend-update.tar.gz | awk '{{print $1}}')
-    if [ "$LOCAL_FE_MD5" != "$REMOTE_FE_MD5" ]; then
-        echo "ERROR: 前端包 md5 不匹配！本地=$LOCAL_FE_MD5 远程=$REMOTE_FE_MD5" >&2
-        exit 1
-    fi
-    echo "前端包 md5 校验通过"
-fi
-if [ -n "$LOCAL_BE_MD5" ]; then
-    REMOTE_BE_MD5=$(md5sum /tmp/backend-update.tar.gz | awk '{{print $1}}')
-    if [ "$LOCAL_BE_MD5" != "$REMOTE_BE_MD5" ]; then
-        echo "ERROR: 后端包 md5 不匹配！本地=$LOCAL_BE_MD5 远程=$REMOTE_BE_MD5" >&2
-        exit 1
-    fi
-    echo "后端包 md5 校验通过"
-fi
-
-# 备份旧目录（失败时可手动回滚：mv backend.bak.xxx backend）
-TIMESTAMP=$(date +%s)
-if [ "$TARGET" = "frontend" ] || [ "$TARGET" = "all" ]; then
-    if [ -d "${{DEPLOY_PATH}}frontend" ]; then
-        cp -r "${{DEPLOY_PATH}}frontend" "${{DEPLOY_PATH}}frontend.bak.$TIMESTAMP"
-    fi
-    cd ${{DEPLOY_PATH}}frontend && tar xzf /tmp/frontend-update.tar.gz
-fi
-if [ "$TARGET" = "backend" ] || [ "$TARGET" = "all" ]; then
-    if [ -d "${{DEPLOY_PATH}}backend" ]; then
-        cp -r "${{DEPLOY_PATH}}backend" "${{DEPLOY_PATH}}backend.bak.$TIMESTAMP"
-    fi
-    cd ${{DEPLOY_PATH}}backend && tar xzf /tmp/backend-update.tar.gz
-fi
-
-cd $DEPLOY_PATH
-if [ "$TARGET" = "frontend" ]; then
-    docker compose build frontend && docker compose up -d frontend
-elif [ "$TARGET" = "backend" ]; then
-    docker compose build backend celery-worker && docker compose up -d backend celery-worker
-else
-    docker compose build && docker compose up -d
-fi
-
-# 循环探测 health（最多等 60s，每 5s 探测一次）
-echo "等待服务就绪..."
-for i in $(seq 1 12); do
-    if curl -s --max-time 5 http://localhost:8000/health > /dev/null 2>&1; then
-        echo "health 检查通过"
-        break
-    fi
-    if [ "$i" -eq 12 ]; then
-        echo "WARNING: 60s 内 health 未就绪，请手动检查"
-    else
-        sleep 5
-    fi
-done
-
-docker compose ps --format table
-
-# 清理超过 3 天的旧备份
-find $DEPLOY_PATH -maxdepth 1 -name "*.bak.*" -mtime +3 -exec rm -rf {{}} \\;
-EOF
-
-DEPLOY_END=$(date +%s)
-echo ""
-echo "部署完成！耗时 $(((DEPLOY_END - DEPLOY_START) / 60))分$(((DEPLOY_END - DEPLOY_START) % 60))秒"
-""", True)
-
-    # P0-3 + P0-4 + P3-11: docker-compose 修复
-    _add("infra/docker/docker-compose.yml", f"""services:
-  backend:
-    build:
-      context: ../../
-      dockerfile: backend/Dockerfile
-    ports:
-      - "8000:8000"
-    env_file: ../../.env
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    stop_grace_period: 30s
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-
-  celery-worker:
-    build:
-      context: ../../
-      dockerfile: backend/Dockerfile
-    command: ["celery", "-A", "worker", "worker", "--loglevel=info", "--concurrency=2"]
-    env_file: ../../.env
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    stop_grace_period: 120s
-
-  frontend:
-    build:
-      context: ../../frontend
-    ports:
-      - "3000:3000"
-    depends_on:
-      - backend
-
-  postgres:
-    image: postgres:16-alpine
-    env_file: ../../.env
-    environment:
-      POSTGRES_USER: ${{POSTGRES_USER:-app}}
-      POSTGRES_PASSWORD: ${{POSTGRES_PASSWORD:-change-me-in-production}}
-      POSTGRES_DB: ${{POSTGRES_DB:-app_db}}
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${{POSTGRES_USER:-app}}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  redis:
-    image: redis:7-alpine
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-volumes:
-  pgdata:
-""")
-
-    # 删掉旧的 infra/docker/Dockerfile（后端 Dockerfile 已移到 backend/）
-
     # Remove firmware if no hardware
     if not info["has_hardware"]:
         f = {k: v for k, v in f.items() if not k.startswith("firmware/")}
@@ -1612,6 +1801,7 @@ def main():
     parser.add_argument("--desc", help="项目描述（跳过交互）")
     parser.add_argument("--server", help="服务器 IP")
     parser.add_argument("--hardware", action="store_true", help="包含硬件端")
+    parser.add_argument("--force", action="store_true", help="覆盖已存在的文件")
     args = parser.parse_args()
 
     info = collect_info(args)
@@ -1630,32 +1820,48 @@ def main():
     for path in sorted(files.keys()):
         full = Path.cwd() / path
         if full.exists():
-            exists.append(path)
-            print(f"    skip  {path}")
+            if args.force:
+                exists.append(path)
+                print(f"    overwrite  {path}")
+            else:
+                exists.append(path)
+                print(f"    skip  {path}")
         else:
             print(f"    +     {path}")
 
-    new_count = len(files) - len(exists)
-    print(f"\n  新增 {new_count} 个文件，跳过 {len(exists)} 个已存在")
+    if args.force:
+        new_count = len(files)
+        overwrite_count = len(exists)
+        print(f"\n  新增 {new_count - overwrite_count} 个文件，覆盖 {overwrite_count} 个已存在")
+    else:
+        new_count = len(files) - len(exists)
+        print(f"\n  新增 {new_count} 个文件，跳过 {len(exists)} 个已存在")
 
     if args.dry_run:
         print("\n  [dry-run] 未写入任何文件。")
         return
 
-    if new_count == 0:
+    if not args.force and new_count == 0:
         print("\n  所有文件都已存在。")
         return
 
-    confirm = input(f"\n  确认生成？[Y/n]: ").strip().lower()
-    if confirm and confirm != "y":
-        print("  已取消。")
-        return
+    # 非交互模式（project_name + desc 都传了）且 force 时直接写入
+    if args.force and args.project_name and args.desc:
+        pass  # skip confirmation
+    else:
+        if args.force:
+            confirm = input(f"\n  将覆盖 {len(exists)} 个已有文件，确认？[Y/n]: ").strip().lower()
+        else:
+            confirm = input(f"\n  确认生成？[Y/n]: ").strip().lower()
+        if confirm and confirm != "y":
+            print("  已取消。")
+            return
 
     print()
     written = 0
     for path, (content, executable) in sorted(files.items()):
         full = Path.cwd() / path
-        if full.exists():
+        if full.exists() and not args.force:
             continue
         full.parent.mkdir(parents=True, exist_ok=True)
         full.write_text(content, encoding="utf-8")
