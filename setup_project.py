@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-大飞哥无敌战队 — 项目协作框架初始化脚本 v4.1
+大飞哥无敌战队 — 项目协作框架初始化脚本 v4.2
 
 生成完整的 Claude Code 项目协作框架：
   agents / hooks / rules / skills / state / contracts / deploy
@@ -54,7 +54,7 @@ def collect_info(args) -> dict:
 
     print()
     print("=" * 60)
-    print("  大飞哥无敌战队 — 项目协作框架初始化 v4.1")
+    print("  大飞哥无敌战队 — 项目协作框架初始化 v4.2")
     print("=" * 60)
     print()
 
@@ -191,7 +191,7 @@ def _build_root_docs(f, info):
 （防止跑偏）
 """)
 
-    _add(".scaffold-version", f"v4.1\ngenerated: {info['date']}\n")
+    _add(".scaffold-version", f"v4.2\ngenerated: {info['date']}\n")
 
 
 def _build_claude_config(f, info):
@@ -209,6 +209,7 @@ def _build_claude_config(f, info):
                 "Bash(npm run lint)",
                 "Bash(npm run test *)",
                 "Bash(pytest *)",
+                "Bash(bash scripts/bootstrap_check.sh)",
             ],
             "deny": [
                 "Edit(./.state/**)",
@@ -781,7 +782,17 @@ app.add_middleware(
 
 @app.get("/health")
 async def health():
-    return {{"status": "ok"}}
+    result = {{"status": "ok"}}
+    try:
+        from database import engine
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        result["database"] = "ok"
+    except Exception as e:
+        result["database"] = str(e)
+        result["status"] = "degraded"
+    return result
 """)
 
     # P0-2: worker.py — Celery 骨架
@@ -801,7 +812,30 @@ def example_task(name: str):
     return f"Hello {name}"
 """)
 
-    # P1-8: models.py — SQLAlchemy 骨架
+    # v4.2: database.py — DB 连接 + session
+    _add("backend/database.py", """import os
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql://app:changeme@localhost:5432/app_db",
+)
+
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+
+def get_db():
+    \"\"\"FastAPI Depends 用的数据库会话生成器。\"\"\"
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+""")
+
+    # v4.2: models.py — 真实可用的示例模型
     _add("backend/models.py", """from sqlalchemy import Column, Integer, String, DateTime, func
 from sqlalchemy.orm import DeclarativeBase
 
@@ -810,12 +844,12 @@ class Base(DeclarativeBase):
     pass
 
 
-# 示例模型（按需修改）
-# class User(Base):
-#     __tablename__ = "users"
-#     id = Column(Integer, primary_key=True)
-#     name = Column(String(100), nullable=False)
-#     created_at = Column(DateTime, server_default=func.now())
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(100), nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
 """)
 
     _add("backend/requirements.txt", """fastapi>=0.110,<1.0
@@ -851,7 +885,7 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 
     _add("backend/alembic.ini", """[alembic]
 script_location = alembic
-sqlalchemy.url = sqlite:///./dev.db
+sqlalchemy.url = postgresql://app:changeme@localhost:5432/app_db
 
 [loggers]
 keys = root,sqlalchemy,alembic
@@ -1179,6 +1213,11 @@ module.exports = {
 };
 """)
 
+    # v4.2: ESLint 配置，让 npm run lint 直接跑不交互
+    _add("frontend/.eslintrc.json", json.dumps({
+        "extends": ["next/core-web-vitals"],
+    }, indent=2, ensure_ascii=False))
+
 
 def _build_infra(f, info):
     """infra/ + 配置文件。"""
@@ -1309,7 +1348,9 @@ echo "部署完成！耗时 $(((DEPLOY_END - DEPLOY_START) / 60))分$(((DEPLOY_E
     # P0-1 fix (方案B): context 保持 ../../，Dockerfile 里 COPY 路径改成 backend/ 前缀
     # P2-12: postgres 去掉 env_file，只保留 environment 块
     # P1-6: 加 nginx 服务（注释掉）
-    _add("infra/docker/docker-compose.yml", f"""services:
+    _add("infra/docker/docker-compose.yml", f"""# 开发时只起数据库：docker compose up postgres redis -d
+
+services:
   backend:
     build:
       context: ../../
@@ -1426,13 +1467,14 @@ def _build_config_files(f, info):
 
     env_lines = [
         "ENV=development", "SECRET_KEY=change-me", "",
-        "DATABASE_URL=sqlite:///./dev.db",
-        "# DATABASE_URL=postgresql://user:pass@localhost:5432/dbname", "",
+        "DATABASE_URL=postgresql://app:changeme@localhost:5432/app_db",
+        "# 超轻量演示模式（不推荐正式开发）：",
+        "# DATABASE_URL=sqlite:///./dev.db", "",
         "REDIS_URL=redis://localhost:6379/0",
         "CORS_ORIGINS=http://localhost:3000", "",
         "# PostgreSQL (docker-compose 使用)",
         "POSTGRES_USER=app",
-        "POSTGRES_PASSWORD=change-me-in-production",
+        "POSTGRES_PASSWORD=changeme",
         "POSTGRES_DB=app_db",
     ]
     if ip:
@@ -1492,6 +1534,41 @@ dump.rdb
 def _build_scripts(f, info):
     """scripts/ 目录。"""
     _add = lambda p, c, x=False: f.__setitem__(p, (c.strip() + "\n", x))
+
+    # v4.2: 环境自检脚本
+    _add("scripts/bootstrap_check.sh", """#!/bin/bash
+# 项目环境自检
+set -u
+
+PASS=0
+FAIL=0
+
+check() {
+    if eval "$2" > /dev/null 2>&1; then
+        echo "  ✅ $1"
+        PASS=$((PASS + 1))
+    else
+        echo "  ❌ $1 — $3"
+        FAIL=$((FAIL + 1))
+    fi
+}
+
+echo ""
+echo "===== 环境自检 ====="
+echo ""
+
+check ".env 文件存在" "[ -f .env ]" "运行: cp .env.example .env && vi .env"
+check "Python >= 3.11" "python3 -c 'import sys; assert sys.version_info >= (3,11)'" "安装 Python 3.11+"
+check "Node >= 18" "node -e 'process.exit(parseInt(process.version.slice(1)) < 18 ? 1 : 0)'" "安装 Node 18+"
+check "Docker 可用" "docker info" "安装并启动 Docker"
+check "docker compose 可用" "docker compose version" "升级 Docker 或安装 compose 插件"
+check "PostgreSQL 容器可连接" "docker compose -f infra/docker/docker-compose.yml exec -T postgres pg_isready -U app" "运行: docker compose -f infra/docker/docker-compose.yml up postgres -d"
+check "Redis 容器可连接" "docker compose -f infra/docker/docker-compose.yml exec -T redis redis-cli ping" "运行: docker compose -f infra/docker/docker-compose.yml up redis -d"
+
+echo ""
+echo "===== 结果：${PASS} 通过，${FAIL} 失败 ====="
+echo ""
+""", True)
 
     _add("scripts/state_cli.py", r"""#!/usr/bin/env python3
 """
@@ -1874,8 +1951,9 @@ def main():
     print(f"\n  ✅ 完成！生成了 {written} 个文件。")
     print(f"""
   下一步：
-    1. cp .env.example .env && vi .env  # 修改配置（开发环境用 sqlite，生产环境改 postgresql）
-    2. git init && git add -A && git commit -m "init: 项目协作框架"
+    1. cp .env.example .env && vi .env  # 修改密码等敏感配置
+    2. bash scripts/bootstrap_check.sh    # 检查环境是否就绪
+    3. git init && git add -A && git commit -m "init: 项目协作框架"
 
   启动各角色：
     大飞哥：cd ~/Projects/{d} && claude --agent 大飞哥
@@ -1888,8 +1966,8 @@ def main():
     查看所有角色：claude agents
 
   环境说明：
-    开发环境：DATABASE_URL=sqlite:///./dev.db（默认，开箱即用）
-    生产环境：修改 .env 中 DATABASE_URL 为 PostgreSQL 连接串
+    默认使用 PostgreSQL（docker compose up postgres redis -d 即可）
+    超轻量演示：修改 .env 中 DATABASE_URL 为 sqlite:///./dev.db
 """)
 
 
