@@ -103,6 +103,7 @@ def _build_root_docs(f, info):
 | 后端 | **乔峰** | 后端开发 | `backend/` |
 | 运维 | **张三丰** | 部署、Docker、联调 | `infra/` |
 | 硬件 | **杨过** | 边缘设备 | `firmware/` |
+| 安全审查员 | **一灯大师** | 安全审查、联调风险审查 | 全局只读 |
 
 ## 身份路由
 
@@ -111,6 +112,7 @@ def _build_root_docs(f, info):
 - `backend/` → **乔峰**
 - `infra/` → **张三丰**
 - `firmware/` → **杨过**
+- 安全审查 → **一灯大师**（只审查不改代码，除非明确要求修复）
 
 ## 三条红线
 
@@ -241,7 +243,11 @@ def _build_claude_config(f, info):
                 {
                     "matcher": "Write|Edit",
                     "hooks": [{"type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/notify-contract-change.sh"}],
-                }
+                },
+                {
+                    "matcher": "Write|Edit",
+                    "hooks": [{"type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/remind-security-review.sh"}],
+                },
             ],
         },
     }
@@ -393,6 +399,65 @@ Docker Compose + Nginx + Bash
 - 所有部署走 deploy.sh
 """)
 
+    _add(".claude/agents/security.md", f"""---
+name: "一灯大师"
+description: "安全审查员 — 安全审查、联调风险审查、bug 风险审查"
+---
+
+# 一灯大师（安全审查员）
+
+你是 {n} 的安全审查员。你不负责功能开发，不负责部署，不直接修改业务代码。你的核心职责是审查代码并输出风险结论。除非明确要求你修复，否则只输出 findings。
+
+## 负责范围
+- 审查后端接口的认证、授权、输入校验、敏感信息泄露
+- 审查前端调用中的越权、危险默认值、错误暴露、空值联调风险
+- 审查 infra 配置中的默认密码、开放端口、debug 模式、日志泄密、错误暴露
+- 审查契约变更带来的联调风险和兼容性风险
+- 重点发现高风险 bug、安全漏洞、联调阶段隐藏问题
+
+## 审查优先级（按危险程度排序）
+1. 认证绕过
+2. 授权缺失 / 越权
+3. 输入校验缺失（注入、XSS）
+4. 文件上传漏洞
+5. 对象存储权限过大
+6. 敏感信息泄露（日志、响应、错误栈）
+7. CORS 配置过宽
+8. SSRF / 回调外部请求
+9. SQL 注入
+10. 命令执行
+11. 路径遍历
+12. 联调契约不一致
+13. 空值 / 异常分支遗漏
+
+## 输出格式
+每个 finding 必须包含以下字段：
+
+| 字段 | 说明 |
+|------|------|
+| 严重级别 | 🔴 高危 / 🟡 中危 / ⚪ 低危 |
+| 问题位置 | 文件路径 + 行号或函数名 |
+| 问题描述 | 具体问题是什么 |
+| 影响 | 可能导致什么后果 |
+| 修复建议 | 具体怎么修 |
+
+审查结束后，即使未发现明显问题，也必须输出：
+- 「未发现明显安全问题」
+- 残余风险说明（哪些方面未覆盖或无法静态判断）
+
+## 禁止事项
+- 不做常规功能开发
+- 不做部署操作
+- 不默认直接修改业务代码（除非明确要求修复）
+- 不泛化成普通代码风格 review，聚焦安全和联调风险
+
+## 新会话启动
+1. 读 CLAUDE.md
+2. 读 contracts/CONTRACTS.md
+3. 读 .env.example
+4. 了解当前待审查的范围
+""")
+
     # ── .claude/hooks/ ──
     _add(".claude/hooks/on-session-start.sh", r"""#!/usr/bin/env bash
 set -euo pipefail
@@ -506,6 +571,37 @@ except: print('')
 case "$FILE_PATH" in
     contracts/*|./contracts/*)
         echo '{"additionalContext": "⚠️ 契约文件已变更，请在任务汇报里标注需同步哪些角色（杨过/黄蓉/乔峰）"}'
+        ;;
+esac
+
+exit 0
+""", True)
+
+    _add(".claude/hooks/remind-security-review.sh", r"""#!/usr/bin/env bash
+set -euo pipefail
+
+command -v python3 >/dev/null 2>&1 || { echo "python3 not found, skipping hook"; exit 0; }
+
+FILE_PATH=$(python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    print(data.get('input', {}).get('file_path', ''))
+except: print('')
+")
+
+case "$FILE_PATH" in
+    backend/main.py|backend/routers/*|backend/api/*|backend/endpoints/*|backend/auth*|backend/upload*)
+        echo '{"additionalContext": "⚠️ 你正在修改后端接口层文件，涉及认证/权限/上传等敏感逻辑时，完成后请通知一灯大师进行安全审查（/security-review）"}'
+        ;;
+    infra/*|*/docker-compose*|*/nginx*|*/Dockerfile*)
+        echo '{"additionalContext": "⚠️ 你正在修改基础设施配置，完成后请通知一灯大师进行安全审查，重点关注默认密码、开放端口、debug 模式"}'
+        ;;
+    .env.example|.env*)
+        echo '{"additionalContext": "⚠️ 环境变量配置已变更，请确认无敏感信息硬编码，完成后通知一灯大师审查"}'
+        ;;
+    contracts/*|./contracts/*)
+        echo '{"additionalContext": "⚠️ 契约变更可能影响联调安全（认证方式、字段校验规则等），完成后请通知一灯大师审查兼容性风险"}'
         ;;
 esac
 
@@ -634,6 +730,30 @@ globs: "contracts/**"
 - 变更后在汇报里标注需同步哪些角色
 """)
 
+    _add(".claude/rules/security-review.md", """---
+description: "安全审查规范 — 涉及安全敏感改动时加载"
+globs: "backend/** infra/** contracts/** .env.example"
+---
+
+# 安全审查规范
+
+## 必须经过一灯大师审查的改动
+以下内容的新增或修改，必须经过安全审查员审查后方可合并：
+- 登录 / 认证 / 鉴权相关代码
+- 文件上传 / 下载功能
+- 对象存储（OSS/S3）配置和调用
+- 回调接口 / webhook
+- 管理后台接口
+- Docker / Nginx / 部署配置
+- `.env.example` 变更
+- `contracts/` 契约变更
+
+## 审查要求
+- 优先识别 🔴 高危和 🟡 中危问题，避免泛化成普通代码风格 review
+- 关注认证、权限、输入校验、日志泄露、配置安全、契约一致性、异常处理
+- 若未发现明显问题，必须说明残余风险和未覆盖项
+""")
+
     # ── .claude/skills/ ──
     _add(".claude/skills/team-status/SKILL.md", """---
 name: "team-status"
@@ -683,6 +803,34 @@ disable-model-invocation: true
 python scripts/state_cli.py team-status
 ```
 然后读取对应目录的 STATUS.md。
+""")
+
+    _add(".claude/skills/security-review/SKILL.md", """---
+name: "security-review"
+description: "触发安全与联调风险审查"
+---
+
+# /security-review
+
+对当前改动或指定范围进行安全审查。
+
+## 审查范围
+- 改动文件中的认证、权限、输入校验
+- 日志和错误响应中的敏感信息泄露
+- 配置文件中的安全隐患（默认密码、debug 模式、开放端口）
+- 契约变更的兼容性和联调风险
+- 异常分支和空值处理遗漏
+
+## 执行
+审查当前 git diff 中的改动：
+```bash
+git diff --name-only HEAD
+```
+然后逐文件审查，按照一灯大师的输出格式给出 findings。
+
+## 输出要求
+- 每个问题按「严重级别 / 问题位置 / 问题描述 / 影响 / 修复建议」输出
+- 即使没有发现问题，也要输出「未发现明显安全问题，残余风险为……」
 """)
 
 
@@ -1962,6 +2110,7 @@ def main():
     前端：  cd ~/Projects/{d} && claude --agent 黄蓉
     运维：  cd ~/Projects/{d} && claude --agent 张三丰
     硬件：  cd ~/Projects/{d} && claude --agent 杨过
+    安全审查：cd ~/Projects/{d} && claude --agent 一灯大师
 
     查看所有角色：claude agents
 
