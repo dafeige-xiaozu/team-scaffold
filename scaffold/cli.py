@@ -193,13 +193,13 @@ def _run_init(args):
     4. git config core.hooksPath .githooks    # 启用 pre-commit / pre-push 自动检查
 
   启动各角色（工程师自动模式，架构师/审查员正常模式）：
-    架构师：  cd ~/Projects/{d} && ./start.sh 王重阳
-    后端：    cd ~/Projects/{d} && ./start.sh 乔峰
-    前端：    cd ~/Projects/{d} && ./start.sh 黄蓉
-    联调：    cd ~/Projects/{d} && ./start.sh 张三丰
-    {'硬件：    cd ~/Projects/' + d + ' && ./start.sh 杨过' if hw else ''}
-    安全审查：cd ~/Projects/{d} && ./start.sh 一灯大师
-    {'嵌入式安全：cd ~/Projects/' + d + ' && ./start.sh 郭靖' if hw else ''}
+    ./start.sh 王重阳     # 架构师
+    ./start.sh 乔峰       # 后端
+    ./start.sh 黄蓉       # 前端
+    ./start.sh 张三丰     # 联调
+    {'./start.sh 杨过       # 硬件' if hw else ''}
+    ./start.sh 一灯大师   # 安全审查
+    {'./start.sh 郭靖       # 嵌入式安全' if hw else ''}
 
     查看所有角色：claude agents
 

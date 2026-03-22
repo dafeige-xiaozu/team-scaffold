@@ -338,7 +338,7 @@ def _build_variables(info: dict) -> dict:
     red_line_1 = (
         "禁止直接改服务器文件，所有部署走 `infra/deploy/deploy.sh`"
         if ip
-        else "禁止直接改服务器文件，部署脚本待服务器确定后生成（`python setup_project.py --server <IP>`）"
+        else "禁止直接改服务器文件，部署脚本待服务器确定后生成（`scaffold init --server <IP> --force`）"
     )
 
     hw_roles_assign = (

@@ -13,7 +13,9 @@ DEPLOY_PATH="{{deploy_path}}"
 echo "===== 部署 ====="
 echo "目标: $TARGET"
 
-cd ~/Projects/{{dir_name}}
+# 定位项目根目录（deploy.sh 在 infra/deploy/ 下）
+PROJECT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
+cd "$PROJECT_DIR"
 
 # ── 打包 + 本地 md5 ──
 if [ "$TARGET" = "frontend" ] || [ "$TARGET" = "all" ]; then
