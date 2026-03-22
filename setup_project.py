@@ -1466,6 +1466,7 @@ def downgrade() -> None:
 
     _add("backend/pyproject.toml", """[tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 python_files = "test_*.py"
 python_functions = "test_*"
 asyncio_mode = "auto"
