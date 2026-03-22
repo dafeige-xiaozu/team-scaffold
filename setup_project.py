@@ -90,6 +90,7 @@ def _build_root_docs(f, info):
     _add = lambda p, c, x=False: f.__setitem__(p, (c.strip() + "\n", x))
 
     n = info["project_name"]
+    ip = info["server_ip"]
 
     _add("CLAUDE.md", f"""# {n}
 
@@ -127,7 +128,7 @@ def _build_root_docs(f, info):
 
 ## 三条红线
 
-1. 禁止直接改服务器文件，所有部署走 `infra/deploy/deploy.sh`
+1. {'禁止直接改服务器文件，所有部署走 `infra/deploy/deploy.sh`' if ip else '禁止直接改服务器文件，部署脚本待服务器确定后生成（`python setup_project.py --server <IP>`）'}
 2. 禁止 `git push --force`
 3. 禁止手动编辑 `.state/` 目录，必须用 `python scripts/state_cli.py`
 
@@ -197,6 +198,10 @@ def _build_claude_config(f, info):
                 "Bash(pytest *)",
                 "Bash(bash scripts/bootstrap_check.sh)",
                 "Bash(bash infra/scripts/smoke-test.sh *)",
+                "Bash(git log *)",
+                "Bash(git status *)",
+                "Bash(git diff *)",
+                "Bash(git show *)",
             ],
             "deny": [
                 "Edit(./.state/**)",
@@ -736,7 +741,8 @@ exit 0
 """, True)
 
     # ── .claude/rules/ ──
-    _add(".claude/rules/00-team-protocol.md", """---
+    _deploy_rule = "所有部署走 infra/deploy/deploy.sh" if info["server_ip"] else "部署方案待服务器确定后配置"
+    _add(".claude/rules/00-team-protocol.md", f"""---
 description: "全局协作规范 — 所有角色常驻加载"
 globs: "**"
 ---
@@ -759,16 +765,19 @@ globs: "**"
 4. push 是否成功
 
 ## Git
-- 每次 commit 后自动 git push origin main
-- 修改完确认 build/test 通过再 commit
+- 工程师角色（乔峰、黄蓉、张三丰、杨过）：修改完确认 build/test 通过再 commit，commit 后 git push origin main
+- 审查角色（一灯大师、郭靖）和架构师（王重阳）：不做 commit 和 push
 
 ## 部署
-- 所有部署走 infra/deploy/deploy.sh
+- {_deploy_rule}
 - 所有配置通过代码仓库管理
 
 ## 状态传承
-- 每次任务完成后更新 STATUS.md
-- 新会话第一件事：读 CLAUDE.md + STATUS.md
+- 每次任务完成后更新对应的状态文件
+- 新会话第一件事：读 CLAUDE.md，然后读自己的状态文件：
+  - 工程师：读对应目录的 STATUS.md（如 backend/STATUS.md）
+  - 架构师：读 ARCHITECT.md
+  - 审查员：读 contracts/CONTRACTS.md
 """)
 
     _add(".claude/rules/01-architect-planning.md", """---
@@ -877,7 +886,8 @@ globs: "firmware/**"
 张三丰（联调负责人）为联调目的修改 firmware/ 文件时，遵循 infra-deploy.md 中的跨目录修改权限，不受本规则的"拒绝"条款约束。
 """)
 
-    _add(".claude/rules/infra-deploy.md", """---
+    _infra_deploy_rule = "所有部署走 infra/deploy/deploy.sh" if info["server_ip"] else "部署方案待服务器确定后配置"
+    _add(".claude/rules/infra-deploy.md", f"""---
 description: "基础设施与联调规范"
 globs: "infra/**"
 ---
@@ -886,7 +896,7 @@ globs: "infra/**"
 
 ## 部署规则
 - 部署前确认 docker compose build 成功
-- 所有部署走 infra/deploy/deploy.sh
+- {_infra_deploy_rule}
 - 部署后必须验证服务健康状态
 
 ## 联调规则
@@ -925,7 +935,7 @@ globs: "contracts/**"
 
     _add(".claude/rules/security-review.md", """---
 description: "安全审查规范 — 涉及安全敏感改动时加载"
-globs: "backend/** infra/** contracts/** .env.example"
+globs: "backend/** frontend/** infra/** contracts/** .env.example"
 ---
 
 # 安全审查规范
@@ -1023,7 +1033,13 @@ git diff HEAD~1 --stat
 ```
 """)
 
-    _add(".claude/skills/assign-task/SKILL.md", """---
+    _hw_roles = """| 杨过 | 设备固件 firmware/ |
+| 张三丰 | 部署联调 infra/ |
+| 一灯大师 | 平台安全审查 |
+| 郭靖 | 嵌入式安全审查 |""" if info["has_hardware"] else """| 张三丰 | 部署联调 infra/ |
+| 一灯大师 | 平台安全审查 |"""
+
+    _add(".claude/skills/assign-task/SKILL.md", f"""---
 name: "assign-task"
 description: "生成标准格式的任务提示词"
 ---
@@ -1037,24 +1053,24 @@ description: "生成标准格式的任务提示词"
 生成的提示词必须包含以下结构：
 
 ```
-任务：{一句话描述}
+任务：{{一句话描述}}
 
 需要读的文件
 
-- {文件路径 1}
-- {文件路径 2}
+- {{文件路径 1}}
+- {{文件路径 2}}
 
 背景
 
-{任务背景说明}
+{{任务背景说明}}
 
 改动清单
 
-{具体步骤}
+{{具体步骤}}
 
 验证标准
 
-{怎么确认做对了}
+{{怎么确认做对了}}
 
 注意：全程自主完成，不要中途停下来问我。
 ```
@@ -1064,10 +1080,7 @@ description: "生成标准格式的任务提示词"
 |------|---------|
 | 黄蓉 | 前端 frontend/ |
 | 乔峰 | 后端 backend/ |
-| 杨过 | 设备固件 firmware/ |
-| 张三丰 | 部署联调 infra/ |
-| 一灯大师 | 平台安全审查 |
-| 郭靖 | 嵌入式安全审查 |
+{_hw_roles}
 """)
 
     _add(".claude/skills/decisions/SKILL.md", """---
@@ -1617,7 +1630,10 @@ def client():
     _add("backend/tests/test_health.py", """def test_health(client):
     resp = client.get(\"/health\")
     assert resp.status_code == 200
-    assert resp.json()[\"status\"] == \"ok\"
+    data = resp.json()
+    assert \"status\" in data
+    # status 可能是 \"ok\" 或 \"degraded\"（取决于数据库是否可用）
+    assert data[\"status\"] in (\"ok\", \"degraded\")
 """)
 
 
@@ -1652,6 +1668,8 @@ def _build_frontend(f, info):
             "tailwindcss": "^3",
             "postcss": "^8",
             "autoprefixer": "^10",
+            "eslint": "^8",
+            "eslint-config-next": "^14",
         },
     }, indent=2, ensure_ascii=False))
 
@@ -1815,6 +1833,9 @@ module.exports = {
         "extends": ["next/core-web-vitals"],
     }, indent=2, ensure_ascii=False))
 
+    # 前端 public 目录（Dockerfile COPY 需要）
+    _add("frontend/public/.gitkeep", "")
+
 
 def _build_infra(f, info):
     """infra/ + 配置文件。"""
@@ -1962,7 +1983,7 @@ services:
         condition: service_healthy
     stop_grace_period: 30s
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s
       timeout: 5s
       retries: 3
