@@ -1,0 +1,15 @@
+.git
+.state
+node_modules
+.next
+out
+__pycache__
+*.pyc
+*.db
+*.pt
+*.onnx
+.env
+.env.*
+data/
+dump.rdb
+*.tar.gz

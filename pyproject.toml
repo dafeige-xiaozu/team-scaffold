@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "team-scaffold"
+version = "5.0.0"
+description = "大飞哥无敌战队 — 项目协作框架生成器"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.9"
+authors = [
+    {name = "大飞哥"},
+]
+
+[project.scripts]
+scaffold = "scaffold.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["scaffold*"]
+
+[tool.setuptools.package-data]
+scaffold = ["templates/**/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_functions = "test_*"
