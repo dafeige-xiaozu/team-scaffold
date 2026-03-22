@@ -52,7 +52,7 @@ if git diff --cached --name-only | grep -q "^backend/.*\.py$"; then
     done < <(git diff --cached --name-only | grep "^backend/.*\.py$")
 fi
 
-# ── 4. hardware py_compile 检查 ──
+{{#has_hardware}}# ── 4. hardware py_compile 检查 ──
 if git diff --cached --name-only | grep -q "^hardware/.*\.py$"; then
     echo "[硬件] Python 语法检查..."
     while read f; do
@@ -65,7 +65,7 @@ if git diff --cached --name-only | grep -q "^hardware/.*\.py$"; then
     done < <(git diff --cached --name-only | grep "^hardware/.*\.py$")
 fi
 
-# ── 5. 契约同步检查 ──
+{{/has_hardware}}# ── 5. 契约同步检查 ──
 if git diff --cached --name-only | grep -qE "^backend/(main\.py|routers/|api/|endpoints/)"; then
     if ! git diff --cached --name-only | grep -q "^contracts/"; then
         echo "⚠️ 警告：修改了后端接口层文件但未更新 contracts/CONTRACTS.md"

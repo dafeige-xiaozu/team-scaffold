@@ -10,14 +10,5 @@ disable-model-invocation: true
 
 ## 执行
 ```bash
-echo "===== 最近 10 次提交 ====="
-git log --oneline -10
-
-echo ""
-echo "===== 未提交的改动 ====="
-git status --short
-
-echo ""
-echo "===== 最近一次提交的详细变更 ====="
-git diff HEAD~1 --stat
+echo "===== 最近 10 次提交 =====" && git log --oneline -10 && echo "" && echo "===== 未提交的改动 =====" && git status --short && echo "" && echo "===== 最近一次提交的详细变更 =====" && git diff HEAD~1 --stat
 ```

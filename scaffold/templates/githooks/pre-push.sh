@@ -4,14 +4,17 @@ set -e
 
 echo "===== Pre-push 检查 ====="
 
-# 1. 禁止 force push
-for arg in "$@"; do
-    case "$arg" in
-        *--force*|*-f*)
-            echo "❌ 禁止 force push" >&2
+# 1. 检测 force push（通过比较新旧 ref）
+while read local_ref local_sha remote_ref remote_sha; do
+    if [ "$remote_sha" != "0000000000000000000000000000000000000000" ] && \
+       [ "$local_sha" != "0000000000000000000000000000000000000000" ]; then
+        # 检查本地提交是否包含远程 HEAD，不包含说明是 force push
+        if ! git merge-base --is-ancestor "$remote_sha" "$local_sha" 2>/dev/null; then
+            echo "❌ 检测到 non-fast-forward push（疑似 force push），阻止推送" >&2
+            echo "   如果确实需要，请联系大飞哥确认" >&2
             exit 1
-            ;;
-    esac
+        fi
+    fi
 done
 
 # 2. 后端全量测试（push 前跑完整测试，不只是增量）

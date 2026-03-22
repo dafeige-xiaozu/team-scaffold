@@ -59,6 +59,30 @@ class TestRenderTemplate:
         result_false = render_template(tpl, {"flag": False})
         assert result_false == "line1\nline4"
 
+    def test_positive_and_negative_condition_together(self):
+        """Both {{#flag}} and {{^flag}} blocks for the same flag."""
+        tpl = "{{#flag}}YES{{/flag}}{{^flag}}NO{{/flag}}"
+        assert render_template(tpl, {"flag": True}) == "YES"
+        assert render_template(tpl, {"flag": False}) == "NO"
+
+    def test_nested_variable_in_condition(self):
+        """Variable substitution inside conditional blocks."""
+        tpl = "{{#show}}Hello {{name}}! {{#extra}}({{role}}){{/extra}}{{/show}}"
+        result = render_template(tpl, {"show": True, "name": "Alice", "extra": True, "role": "admin"})
+        assert result == "Hello Alice! (admin)"
+        result2 = render_template(tpl, {"show": True, "name": "Bob", "extra": False, "role": "user"})
+        assert result2 == "Hello Bob! "
+        result3 = render_template(tpl, {"show": False, "name": "X", "extra": True, "role": "Y"})
+        assert result3 == ""
+
+    def test_multiple_conditions_different_flags(self):
+        """Multiple condition blocks with different flags."""
+        tpl = "A{{#x}}B{{/x}}C{{#y}}D{{/y}}E"
+        assert render_template(tpl, {"x": True, "y": True}) == "ABCDE"
+        assert render_template(tpl, {"x": True, "y": False}) == "ABCE"
+        assert render_template(tpl, {"x": False, "y": True}) == "ACDE"
+        assert render_template(tpl, {"x": False, "y": False}) == "ACE"
+
 
 # ── generate_files tests ──
 
@@ -182,6 +206,56 @@ class TestGenerateFiles:
 
     def test_version(self):
         assert __version__ == "5.0.0"
+
+    def test_force_overwrite(self, base_info, tmp_path):
+        """--force should overwrite existing files."""
+        files = generate_files(base_info)
+        # Write files to disk first
+        for path, (content, _) in files.items():
+            full = tmp_path / path
+            full.parent.mkdir(parents=True, exist_ok=True)
+            full.write_text(content, encoding="utf-8")
+        # Modify one file
+        claude_md = tmp_path / "CLAUDE.md"
+        claude_md.write_text("modified content", encoding="utf-8")
+        assert claude_md.read_text() == "modified content"
+        # Re-generate and overwrite
+        files2 = generate_files(base_info)
+        for path, (content, _) in files2.items():
+            full = tmp_path / path
+            full.parent.mkdir(parents=True, exist_ok=True)
+            full.write_text(content, encoding="utf-8")
+        # Should be overwritten with generated content
+        assert "测试项目" in claude_md.read_text()
+
+    def test_no_hardware_excludes_hardware_references_in_content(self, base_info):
+        """Without hardware, generated content should not mention hardware roles."""
+        base_info["has_hardware"] = False
+        files = generate_files(base_info)
+        # Check architect.md does not mention hardware-only roles
+        architect = files[".claude/agents/architect.md"][0]
+        assert "杨过" not in architect
+        assert "郭靖" not in architect
+        # Check devops.md does not mention device debugging sections
+        devops = files[".claude/agents/devops.md"][0]
+        assert "设备联调" not in devops
+        assert "设备侧必验项" not in devops
+        # Check team protocol does not mention hardware roles
+        protocol = files[".claude/rules/00-team-protocol.md"][0]
+        assert "杨过" not in protocol
+
+    def test_hardware_includes_hardware_references_in_content(self, base_info):
+        """With hardware, generated content should include hardware roles."""
+        base_info["has_hardware"] = True
+        files = generate_files(base_info)
+        architect = files[".claude/agents/architect.md"][0]
+        assert "杨过" in architect
+        assert "郭靖" in architect
+        devops = files[".claude/agents/devops.md"][0]
+        assert "设备联调" in devops
+        assert "设备侧必验项" in devops
+        protocol = files[".claude/rules/00-team-protocol.md"][0]
+        assert "杨过" in protocol
 
     def test_template_variables_not_leaked(self, base_info):
         """Ensure no unresolved {{variable}} patterns remain (except intentional ones)."""

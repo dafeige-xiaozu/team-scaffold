@@ -17,17 +17,27 @@ echo "目标: $TARGET"
 PROJECT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$PROJECT_DIR"
 
+# md5 兼容检测（macOS 没有 md5sum）
+if command -v md5sum >/dev/null 2>&1; then
+    MD5_CMD="md5sum"
+elif command -v md5 >/dev/null 2>&1; then
+    MD5_CMD="md5 -r"
+else
+    echo "WARNING: 无 md5 校验工具，跳过校验"
+    MD5_CMD="echo SKIP"
+fi
+
 # ── 打包 + 本地 md5 ──
 if [ "$TARGET" = "frontend" ] || [ "$TARGET" = "all" ]; then
     echo "打包前端..."
     tar czf /tmp/frontend-update.tar.gz --exclude='node_modules' --exclude='.next' --exclude='.git' -C frontend .
-    LOCAL_FE_MD5=$(md5sum /tmp/frontend-update.tar.gz | awk '{print $1}')
+    LOCAL_FE_MD5=$($MD5_CMD /tmp/frontend-update.tar.gz | awk '{print $1}')
     echo "前端包 md5: $LOCAL_FE_MD5"
 fi
 if [ "$TARGET" = "backend" ] || [ "$TARGET" = "all" ]; then
     echo "打包后端..."
     tar czf /tmp/backend-update.tar.gz --exclude='__pycache__' --exclude='data' --exclude='*.db' --exclude='*.pt' --exclude='*.onnx' --exclude='.git' -C backend .
-    LOCAL_BE_MD5=$(md5sum /tmp/backend-update.tar.gz | awk '{print $1}')
+    LOCAL_BE_MD5=$($MD5_CMD /tmp/backend-update.tar.gz | awk '{print $1}')
     echo "后端包 md5: $LOCAL_BE_MD5"
 fi
 

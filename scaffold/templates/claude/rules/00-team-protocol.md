@@ -16,20 +16,20 @@ globs: "**"
 
 ## 汇报格式
 
-### 工程师（乔峰、黄蓉、张三丰、杨过）— 缺一不可
+### 工程师（乔峰、黄蓉、张三丰{{#has_hardware}}、杨过{{/has_hardware}}）— 缺一不可
 1. 改了哪些文件
 2. commit message
 3. 是否已 git push origin main
 4. push 是否成功
 
-### 审查员（王重阳、一灯大师、郭靖）
+### 审查员（王重阳、一灯大师{{#has_hardware}}、郭靖{{/has_hardware}}）
 1. 审查了哪些文件
 2. 发现的问题（按严重级别排序）
 3. 修复建议
 
 ## Git
-- 工程师角色（乔峰、黄蓉、张三丰、杨过）：修改完确认 build/test 通过再 commit，commit 后 git push origin main
-- 审查角色（一灯大师、郭靖）和架构师（王重阳）：不做 commit 和 push
+- 工程师角色（乔峰、黄蓉、张三丰{{#has_hardware}}、杨过{{/has_hardware}}）：修改完确认 build/test 通过再 commit，commit 后 git push origin main
+- 审查角色（一灯大师{{#has_hardware}}、郭靖{{/has_hardware}}）和架构师（王重阳）：不做 commit 和 push
 
 ## 部署
 - {{deploy_rule}}

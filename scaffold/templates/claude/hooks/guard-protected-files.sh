@@ -15,7 +15,7 @@ except: print('')
 
 case "$FILE_PATH" in
     .state/*|./.state/*)
-        echo "BLOCKED: .state/ 目录禁止直接编辑。请用：python scripts/state_cli.py status-set <role> --task '...' --progress '...'" >&2
+        echo "BLOCKED: .state/ 目录禁止直接编辑。请手动编辑对应目录的 STATUS.md 文件" >&2
         exit 2
         ;;
 esac
