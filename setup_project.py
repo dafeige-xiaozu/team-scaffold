@@ -2,6 +2,8 @@
 """
 大飞哥无敌战队 — 项目协作框架初始化脚本 v4.2
 
+仓库：https://github.com/dafeige-xiaozu/team-scaffold
+
 生成完整的 Claude Code 项目协作框架：
   agents / hooks / rules / skills / state / contracts / deploy
   + 后端骨架（FastAPI）+ 前端骨架（Next.js）
