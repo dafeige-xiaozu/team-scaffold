@@ -91,8 +91,6 @@ def _gen_settings_json(info: dict) -> str:
             "allow": [
                 "Bash(python scripts/state_cli.py *)",
                 "Bash(pip freeze *)",
-                "Bash(npm run lint)",
-                "Bash(npm run test *)",
                 "Bash(pytest *)",
                 "Bash(bash scripts/bootstrap_check.sh)",
                 "Bash(bash infra/scripts/smoke-test.sh *)",
@@ -133,7 +131,7 @@ def _gen_settings_json(info: dict) -> str:
                 "Bash(rm -rf backend/)",
                 "Bash(rm -rf frontend/)",
                 "Bash(rm -rf infra/)",
-                "Bash(rm -rf firmware/)",
+                "Bash(rm -rf hardware/)",
                 "Bash(rm -rf node_modules/)",
                 "Bash(docker system prune *)",
             ],
@@ -344,7 +342,7 @@ def _build_variables(info: dict) -> dict:
     )
 
     hw_roles_assign = (
-        "| 杨过 | 设备固件 firmware/ |\n| 张三丰 | 部署联调 infra/ |\n| 一灯大师 | 平台安全审查 |\n| 郭靖 | 嵌入式安全审查 |"
+        "| 杨过 | 设备固件 hardware/ |\n| 张三丰 | 部署联调 infra/ |\n| 一灯大师 | 平台安全审查 |\n| 郭靖 | 嵌入式安全审查 |"
         if info["has_hardware"]
         else "| 张三丰 | 部署联调 infra/ |\n| 一灯大师 | 平台安全审查 |"
     )

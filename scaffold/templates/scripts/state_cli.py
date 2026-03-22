@@ -11,8 +11,6 @@
 import argparse
 import json
 import os
-import sys
-import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -31,28 +29,7 @@ except ImportError:
     fcntl = _FcntlStub()
 
 STATE_DIR = Path(__file__).resolve().parent.parent / ".state"
-STATUS_DIR = STATE_DIR / "status"
 DECISIONS_FILE = STATE_DIR / "decisions.json"
-
-ROLES = ["backend", "frontend", "firmware", "infra", "architect"]
-
-
-def _atomic_write(path: Path, content: str):
-    """Write via temp file + rename for atomicity."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp = tempfile.mkstemp(dir=str(path.parent), suffix=".tmp")
-    closed = False
-    try:
-        os.write(fd, content.encode("utf-8"))
-        os.close(fd)
-        closed = True
-        os.rename(tmp, str(path))
-    except Exception:
-        if not closed:
-            os.close(fd)
-        if os.path.exists(tmp):
-            os.unlink(tmp)
-        raise
 
 
 def _load_decisions() -> list:
@@ -82,7 +59,7 @@ def cmd_team_status(args):
         "backend": "backend/STATUS.md",
         "frontend": "frontend/STATUS.md",
         "infra": "infra/STATUS.md",
-        "firmware": "firmware/STATUS.md",
+        "hardware": "hardware/STATUS.md",
         "architect": "ARCHITECT.md",
     }
     for role, path in status_files.items():

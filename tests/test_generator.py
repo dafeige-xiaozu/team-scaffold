@@ -99,19 +99,21 @@ class TestGenerateFiles:
         claude_md = files["CLAUDE.md"][0]
         assert "测试项目" in claude_md
 
-    def test_no_hardware_excludes_firmware(self, base_info):
+    def test_no_hardware_excludes_hardware_dir(self, base_info):
         base_info["has_hardware"] = False
         files = generate_files(base_info)
-        firmware_files = [k for k in files if k.startswith("firmware/")]
-        assert len(firmware_files) == 0
-        # Also no iot-security agent
+        hardware_files = [k for k in files if k.startswith("hardware/")]
+        assert len(hardware_files) == 0
+        # Also no hardware agent or iot-security agent
+        assert ".claude/agents/hardware.md" not in files
         assert ".claude/agents/iot-security.md" not in files
         assert ".claude/hooks/remind-iot-security-review.sh" not in files
 
-    def test_hardware_includes_firmware(self, base_info):
+    def test_hardware_includes_hardware_dir(self, base_info):
         base_info["has_hardware"] = True
         files = generate_files(base_info)
-        assert "firmware/STATUS.md" in files
+        assert "hardware/STATUS.md" in files
+        assert ".claude/agents/hardware.md" in files
         assert ".claude/agents/iot-security.md" in files
         assert ".claude/hooks/remind-iot-security-review.sh" in files
 
@@ -186,7 +188,6 @@ class TestGenerateFiles:
         files = generate_files(base_info)
         # These files intentionally contain {{ }} for user-facing templates
         intentional_files = {
-            ".claude/agents/devops.md",  # 联调报告模板
             ".claude/skills/assign-task/SKILL.md",  # 提示词模板
         }
         import re

@@ -20,9 +20,9 @@ description: "触发嵌入式与物联网安全审查"
 - 资源管理、异常恢复、故障降级
 
 ## 执行
-审查 firmware/ 目录下的改动：
+审查 hardware/ 目录下的改动：
 ```bash
-git diff --name-only HEAD -- firmware/
+git diff --name-only HEAD -- hardware/
 ```
 然后逐文件审查，按照郭靖的输出格式给出 findings。
 

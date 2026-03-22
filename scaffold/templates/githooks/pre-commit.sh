@@ -42,27 +42,27 @@ fi
 # ── 3. 后端 py_compile 检查 ──
 if git diff --cached --name-only | grep -q "^backend/.*\.py$"; then
     echo "[后端] Python 语法检查..."
-    git diff --cached --name-only | grep "^backend/.*\.py$" | while read f; do
+    while read f; do
         if [ -f "$f" ]; then
             python3 -m py_compile "$f" 2>&1 || {
                 echo "❌ $f 语法错误，阻止提交" >&2
                 FAILED=1
             }
         fi
-    done
+    done < <(git diff --cached --name-only | grep "^backend/.*\.py$")
 fi
 
-# ── 4. firmware py_compile 检查 ──
-if git diff --cached --name-only | grep -q "^firmware/.*\.py$"; then
+# ── 4. hardware py_compile 检查 ──
+if git diff --cached --name-only | grep -q "^hardware/.*\.py$"; then
     echo "[硬件] Python 语法检查..."
-    git diff --cached --name-only | grep "^firmware/.*\.py$" | while read f; do
+    while read f; do
         if [ -f "$f" ]; then
             python3 -m py_compile "$f" 2>&1 || {
                 echo "❌ $f 语法错误，阻止提交" >&2
                 FAILED=1
             }
         fi
-    done
+    done < <(git diff --cached --name-only | grep "^hardware/.*\.py$")
 fi
 
 # ── 5. 契约同步检查 ──
@@ -82,7 +82,7 @@ if git diff --cached --name-only | grep -qE "\.env$|\.env\.local$|credentials|se
 fi
 
 # ── 7. 大文件检查 ──
-git diff --cached --name-only | while read f; do
+while read f; do
     if [ -f "$f" ]; then
         SIZE=$(wc -c < "$f" 2>/dev/null || echo 0)
         if [ "$SIZE" -gt 10485760 ]; then  # 10MB
@@ -90,7 +90,7 @@ git diff --cached --name-only | while read f; do
             FAILED=1
         fi
     fi
-done
+done < <(git diff --cached --name-only)
 
 if [ "$FAILED" -ne 0 ]; then
     echo ""

@@ -18,10 +18,6 @@ case "$FILE_PATH" in
         echo "BLOCKED: .state/ 目录禁止直接编辑。请用：python scripts/state_cli.py status-set <role> --task '...' --progress '...'" >&2
         exit 2
         ;;
-    requirements.txt|./requirements.txt)
-        echo "BLOCKED: 根目录 requirements.txt 禁止手动编辑。请用：pip freeze > requirements.txt" >&2
-        exit 2
-        ;;
 esac
 
 exit 0

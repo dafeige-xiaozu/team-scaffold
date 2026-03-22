@@ -10,7 +10,7 @@
     {"output": ".claude/agents/architect.md", "template": "claude/agents/architect.md"},
     {"output": ".claude/agents/backend.md", "template": "claude/agents/backend.md"},
     {"output": ".claude/agents/frontend.md", "template": "claude/agents/frontend.md"},
-    {"output": ".claude/agents/hardware.md", "template": "claude/agents/hardware.md"},
+    {"output": ".claude/agents/hardware.md", "template": "claude/agents/hardware.md", "condition": "has_hardware"},
     {"output": ".claude/agents/devops.md", "template": "claude/agents/devops.md"},
     {"output": ".claude/agents/security.md", "template": "claude/agents/security.md"},
     {"output": ".claude/agents/iot-security.md", "template": "claude/agents/iot-security.md", "condition": "has_hardware"},
@@ -90,7 +90,7 @@
     {"output": "infra/nginx/default.conf", "template": "infra/nginx-default.conf"},
     {"output": "infra/STATUS.md", "template": "status/role_status.md"},
 
-    {"output": "firmware/STATUS.md", "template": "status/role_status.md", "condition": "has_hardware"},
+    {"output": "hardware/STATUS.md", "template": "status/role_status.md", "condition": "has_hardware"},
 
     {"output": "pip.conf", "template": "config/pip.conf"},
     {"output": ".npmrc", "template": "config/npmrc"},

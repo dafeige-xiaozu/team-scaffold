@@ -16,7 +16,7 @@ mapping = {
     '乔峰': 'backend',
     '黄蓉': 'frontend',
     '张三丰': 'infra',
-    '杨过': 'firmware',
+    '杨过': 'hardware',
     '一灯大师': 'security',
     '郭靖': 'iot-security',
 }
@@ -31,10 +31,10 @@ case "$STATUS_KEY" in
     backend)      echo "📋 请先读: backend/STATUS.md + contracts/CONTRACTS.md" ;;
     frontend)     echo "📋 请先读: frontend/STATUS.md" ;;
     infra)        echo "📋 请先读: infra/STATUS.md + contracts/CONTRACTS.md" ;;
-    firmware)     echo "📋 请先读: firmware/STATUS.md + contracts/CONTRACTS.md" ;;
+    hardware)     echo "📋 请先读: hardware/STATUS.md + contracts/CONTRACTS.md" ;;
     architect)    echo "📋 请先读: ARCHITECT.md" ;;
     security)     echo "📋 请先读: contracts/CONTRACTS.md + .env.example" ;;
-    iot-security) echo "📋 请先读: contracts/CONTRACTS.md + firmware/STATUS.md" ;;
+    iot-security) echo "📋 请先读: contracts/CONTRACTS.md + hardware/STATUS.md" ;;
     *)            echo "首次启动，无历史状态" ;;
 esac
 
