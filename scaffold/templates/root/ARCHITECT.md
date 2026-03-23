@@ -1,4 +1,4 @@
-# ARCHITECT.md — 王重阳运行状态
+# ARCHITECT.md — {{role_architect}}运行状态
 
 > 新会话说：「读 CLAUDE.md 和 ARCHITECT.md，继续开发」
 

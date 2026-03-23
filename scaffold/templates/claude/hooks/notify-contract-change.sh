@@ -14,7 +14,7 @@ except: print('')
 
 case "$FILE_PATH" in
     contracts/*|./contracts/*)
-        echo '{"additionalContext": "⚠️ 契约文件已变更，请在任务汇报里标注需同步哪些角色（{{#has_hardware}}杨过/{{/has_hardware}}黄蓉/乔峰）"}'
+        echo '{"additionalContext": "⚠️ 契约文件已变更，请在任务汇报里标注需同步哪些角色（{{#has_hardware}}{{role_hardware}}/{{/has_hardware}}{{role_frontend}}/{{role_backend}}）"}'
         ;;
 esac
 

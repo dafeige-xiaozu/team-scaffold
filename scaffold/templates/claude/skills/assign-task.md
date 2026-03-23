@@ -5,7 +5,7 @@ description: "生成标准格式的任务提示词"
 
 # /assign-task
 
-辅助王重阳生成标准格式的任务提示词，发给指定角色执行。
+辅助{{role_architect}}生成标准格式的任务提示词，发给指定角色执行。
 
 ## 提示词模板
 
@@ -37,6 +37,6 @@ description: "生成标准格式的任务提示词"
 ## 可分配的角色
 | 角色 | 负责范围 |
 |------|---------|
-| 黄蓉 | 前端 frontend/ |
-| 乔峰 | 后端 backend/ |
+| {{role_frontend}} | 前端 frontend/ |
+| {{role_backend}} | 后端 backend/ |
 {{hw_roles_assign}}

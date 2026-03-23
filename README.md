@@ -1,6 +1,6 @@
 # team-scaffold
 
-大飞哥无敌战队 -- 项目协作框架生成器 v5.0.0
+项目协作框架生成器 v6.0.0
 
 一键生成多角色协作项目的完整骨架：CLAUDE.md、agents、hooks、rules、skills、前后端代码、基础设施配置、契约文档、状态管理等。
 
@@ -19,6 +19,16 @@ scaffold init
 
 # 非交互模式
 scaffold init --project-name "我的项目" --desc "一句话描述"
+
+# 自定义团队名和角色名
+scaffold init --project-name "我的项目" --desc "一句话描述" \
+  --team-name "星辰战队" \
+  --role owner=老王 \
+  --role architect=诸葛亮 \
+  --role frontend=貂蝉 \
+  --role backend=关羽 \
+  --role devops=赵云 \
+  --role security=司马懿
 
 # 预览不写入
 scaffold init --dry-run --project-name "我的项目" --desc "一句话描述"
@@ -66,24 +76,28 @@ scaffold version
 |------|------|
 | `--project-name` | 项目名称（中文），跳过交互 |
 | `--desc` | 项目描述（一句话），跳过交互 |
+| `--team-name` | 团队名称（默认：大飞哥无敌战队） |
+| `--role KEY=NAME` | 自定义角色代号，可多次使用 |
 | `--server` | 服务器 IP，生成部署脚本 |
 | `--hardware` | 包含硬件端目录和相关 agent |
 | `--dry-run` | 只预览不写入文件 |
 | `--force` | 覆盖已存在的文件 |
 | `--output-dir` | 指定输出目录（默认当前目录） |
 
-## 角色体系
+## 可自定义的角色
 
-| 角色 | 代号 | 职责 |
-|------|------|------|
-| 产品负责人 | 大飞哥 | 提需求、做决策 |
-| 架构师 | 王重阳 | 技术拆解、任务编排 |
-| 前端工程师 | 黄蓉 | frontend/ 开发 |
-| 后端工程师 | 乔峰 | backend/ 开发 |
-| 联调负责人 | 张三丰 | infra/ + 全链路联调 |
-| 硬件工程师 | 杨过 | hardware/ 开发（可选） |
-| 平台安全审查员 | 一灯大师 | 安全审查 |
-| 嵌入式安全审查员 | 郭靖 | 设备安全审查（可选） |
+| 角色 key | 默认代号 | 职责 |
+|----------|----------|------|
+| `owner` | 大飞哥 | 产品负责人 |
+| `architect` | 王重阳 | 架构师 |
+| `frontend` | 黄蓉 | 前端工程师 |
+| `backend` | 乔峰 | 后端工程师 |
+| `devops` | 张三丰 | 联调负责人 |
+| `hardware` | 杨过 | 硬件工程师（可选） |
+| `security` | 一灯大师 | 平台安全审查员 |
+| `iot_security` | 郭靖 | 嵌入式安全审查员（可选） |
+
+交互模式下会询问是否自定义角色代号；非交互模式通过 `--role` 参数指定。
 
 ## 开发
 

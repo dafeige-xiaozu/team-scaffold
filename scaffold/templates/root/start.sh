@@ -1,7 +1,6 @@
 #!/bin/bash
 # 启动角色
-# 用法：./start.sh 乔峰
-#       ./start.sh 王重阳
+# 用法：./start.sh <角色名>
 set -e
 
 AGENT="${1:?用法: ./start.sh <角色名>}"

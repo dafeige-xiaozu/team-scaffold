@@ -13,7 +13,7 @@ except: print('')
 
 case "$FILE_PATH" in
     hardware/*|./hardware/*)
-        echo '{"additionalContext": "⚠️ 你正在修改 hardware/ 下的代码。涉及鉴权、通信、OTA、密钥、外设控制等敏感逻辑时，完成后请通知郭靖进行嵌入式安全审查（/iot-security-review）"}'
+        echo '{"additionalContext": "⚠️ 你正在修改 hardware/ 下的代码。涉及鉴权、通信、OTA、密钥、外设控制等敏感逻辑时，完成后请通知{{role_iot_security}}进行嵌入式安全审查（/iot-security-review）"}'
         ;;
 esac
 

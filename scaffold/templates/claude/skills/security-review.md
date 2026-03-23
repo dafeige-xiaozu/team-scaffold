@@ -19,7 +19,7 @@ description: "触发安全与联调风险审查"
 ```bash
 git diff --name-only HEAD
 ```
-然后逐文件审查，按照一灯大师的输出格式给出 findings。
+然后逐文件审查，按照{{role_security}}的输出格式给出 findings。
 
 ## 输出要求
 - 每个问题按「严重级别 / 问题位置 / 问题描述 / 影响 / 修复建议」输出

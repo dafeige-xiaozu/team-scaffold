@@ -5,7 +5,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from scaffold import __version__
+from scaffold import DEFAULT_ROLES, DEFAULT_TEAM_NAME, ROLE_LABELS, __version__
 
 
 def ask(prompt: str, default: str = "") -> str:
@@ -14,8 +14,41 @@ def ask(prompt: str, default: str = "") -> str:
     return val or default
 
 
+def _collect_roles(has_hardware: bool) -> dict:
+    """交互式收集角色名称。"""
+    customize = ask("是否自定义角色代号", "N")
+    if customize.lower() not in ("y", "yes"):
+        return dict(DEFAULT_ROLES)
+
+    print("\n  ── 角色代号（回车用默认）──")
+    roles = {}
+    for key, default_name in DEFAULT_ROLES.items():
+        # 跳过硬件相关角色（如果没有硬件端）
+        if not has_hardware and key in ("hardware", "iot_security"):
+            roles[key] = default_name
+            continue
+        label = ROLE_LABELS[key]
+        roles[key] = ask(f"{label}", default_name)
+    return roles
+
+
 def collect_info(args) -> dict:
     """收集项目信息，支持交互和非交互两种模式。"""
+    team_name = getattr(args, "team_name", None) or DEFAULT_TEAM_NAME
+    roles = dict(DEFAULT_ROLES)
+
+    # 解析 --role 参数
+    if hasattr(args, "role") and args.role:
+        for pair in args.role:
+            if "=" not in pair:
+                print(f"  ⚠️  无效的角色参数: {pair}（格式: key=名字）")
+                sys.exit(1)
+            key, name = pair.split("=", 1)
+            if key not in DEFAULT_ROLES:
+                print(f"  ⚠️  未知角色 key: {key}（可用: {', '.join(DEFAULT_ROLES.keys())}）")
+                sys.exit(1)
+            roles[key] = name
+
     info = {
         "project_name": args.project_name or "",
         "project_desc": args.desc or "",
@@ -26,6 +59,8 @@ def collect_info(args) -> dict:
         "has_hardware": False,
         "dir_name": Path.cwd().name,
         "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        "team_name": team_name,
+        "roles": roles,
     }
 
     if args.project_name and args.desc:
@@ -36,9 +71,11 @@ def collect_info(args) -> dict:
 
     print()
     print("=" * 60)
-    print(f"  大飞哥无敌战队 — 项目协作框架初始化 v{__version__}")
+    print(f"  项目协作框架初始化 v{__version__}")
     print("=" * 60)
     print()
+
+    info["team_name"] = ask("团队名称", team_name)
 
     info["project_name"] = ask("项目名称（中文）", info["project_name"])
     while not info["project_name"]:
@@ -60,13 +97,16 @@ def collect_info(args) -> dict:
     hw = ask("是否有独立硬件端仓库", "N")
     info["has_hardware"] = hw.lower() in ("y", "yes")
 
+    print("\n  ── 角色配置 ──")
+    info["roles"] = _collect_roles(info["has_hardware"])
+
     return info
 
 
 def main():
     parser = argparse.ArgumentParser(
         prog="scaffold",
-        description="大飞哥无敌战队 — 项目协作框架初始化",
+        description="项目协作框架初始化",
     )
     sub = parser.add_subparsers(dest="command")
 
@@ -82,6 +122,13 @@ def main():
         "--output-dir",
         help="输出目录（默认当前目录）",
         default=None,
+    )
+    init_p.add_argument("--team-name", help="团队名称（默认：大飞哥无敌战队）")
+    init_p.add_argument(
+        "--role",
+        action="append",
+        metavar="KEY=NAME",
+        help="自定义角色代号，如 --role owner=老王 --role architect=诸葛亮",
     )
 
     # scaffold version
@@ -117,9 +164,12 @@ def _run_init(args):
 
     files = generate_files(info)
 
+    roles = info["roles"]
+
     # Preview
     print()
     print("=" * 60)
+    print(f"  团队：{info['team_name']}")
     print(f"  项目：{info['project_name']}")
     print(f"  目录：{output_dir}")
     print(f"  文件：{len(files)} 个")
@@ -182,7 +232,6 @@ def _run_init(args):
         print(f"  + {path}")
         written += 1
 
-    d = info["dir_name"]
     hw = info["has_hardware"]
     print(f"\n  ✅ 完成！生成了 {written} 个文件。")
     print(f"""
@@ -193,13 +242,13 @@ def _run_init(args):
     4. git config core.hooksPath .githooks    # 启用 pre-commit / pre-push 自动检查
 
   启动各角色（工程师自动模式，架构师/审查员正常模式）：
-    ./start.sh 王重阳     # 架构师
-    ./start.sh 乔峰       # 后端
-    ./start.sh 黄蓉       # 前端
-    ./start.sh 张三丰     # 联调
-    {'./start.sh 杨过       # 硬件' if hw else ''}
-    ./start.sh 一灯大师   # 安全审查
-    {'./start.sh 郭靖       # 嵌入式安全' if hw else ''}
+    ./start.sh {roles['architect']}     # 架构师
+    ./start.sh {roles['backend']}       # 后端
+    ./start.sh {roles['frontend']}       # 前端
+    ./start.sh {roles['devops']}     # 联调
+    {'./start.sh ' + roles['hardware'] + '       # 硬件' if hw else ''}
+    ./start.sh {roles['security']}   # 安全审查
+    {'./start.sh ' + roles['iot_security'] + '       # 嵌入式安全' if hw else ''}
 
     查看所有角色：claude agents
 

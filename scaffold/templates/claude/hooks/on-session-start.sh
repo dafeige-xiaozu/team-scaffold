@@ -12,13 +12,13 @@ AGENT_NAME="${CLAUDE_AGENT_NAME:-unknown}"
 # 角色名 → 状态文件目录映射
 STATUS_KEY=$(python3 -c "
 mapping = {
-    '王重阳': 'architect',
-    '乔峰': 'backend',
-    '黄蓉': 'frontend',
-    '张三丰': 'infra',
-{{#has_hardware}}    '杨过': 'hardware',
-{{/has_hardware}}    '一灯大师': 'security',
-{{#has_hardware}}    '郭靖': 'iot-security',
+    '{{role_architect}}': 'architect',
+    '{{role_backend}}': 'backend',
+    '{{role_frontend}}': 'frontend',
+    '{{role_devops}}': 'infra',
+{{#has_hardware}}    '{{role_hardware}}': 'hardware',
+{{/has_hardware}}    '{{role_security}}': 'security',
+{{#has_hardware}}    '{{role_iot_security}}': 'iot-security',
 {{/has_hardware}}
 }
 print(mapping.get('${AGENT_NAME}', 'unknown'))

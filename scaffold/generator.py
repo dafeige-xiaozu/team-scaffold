@@ -13,6 +13,8 @@ import re
 from importlib import resources
 from pathlib import Path
 
+from scaffold import DEFAULT_ROLES, DEFAULT_TEAM_NAME
+
 
 def _load_manifest() -> dict:
     """加载 manifest.json。"""
@@ -243,13 +245,14 @@ def _gen_eslintrc_json(info: dict) -> str:
 def _gen_decisions_json(info: dict) -> str:
     """生成 .state/decisions.json。"""
     from datetime import datetime, timezone
+    roles = info.get("roles", DEFAULT_ROLES)
     now = datetime.now(timezone.utc).isoformat()
     data = [
         {
             "id": "DEC-001",
             "title": "时间统一 UTC ISO 8601（Z 结尾），前端转本地时间",
             "status": "locked",
-            "proposed_by": "王重阳",
+            "proposed_by": roles["architect"],
             "proposed_at": now,
             "locked_at": now,
         },
@@ -257,7 +260,7 @@ def _gen_decisions_json(info: dict) -> str:
             "id": "DEC-002",
             "title": "pip/npm 统一国内镜像源（清华/淘宝）",
             "status": "locked",
-            "proposed_by": "王重阳",
+            "proposed_by": roles["architect"],
             "proposed_at": now,
             "locked_at": now,
         },
@@ -327,6 +330,8 @@ def _build_variables(info: dict) -> dict:
     """从 info 构建模板变量字典。"""
     ip = info["server_ip"]
     d = info["dir_name"]
+    roles = info.get("roles", DEFAULT_ROLES)
+    team_name = info.get("team_name", DEFAULT_TEAM_NAME)
 
     deploy_rule = (
         "所有部署走 infra/deploy/deploy.sh"
@@ -341,22 +346,28 @@ def _build_variables(info: dict) -> dict:
         else "禁止直接改服务器文件，部署脚本待服务器确定后生成（`scaffold init --server <IP> --force`）"
     )
 
+    r = roles  # shorthand
+
     hw_roles_assign = (
-        "| 杨过 | 设备固件 hardware/ |\n| 张三丰 | 部署联调 infra/ |\n| 一灯大师 | 平台安全审查 |\n| 郭靖 | 嵌入式安全审查 |"
+        f"| {r['hardware']} | 设备固件 hardware/ |\n| {r['devops']} | 部署联调 infra/ |\n| {r['security']} | 平台安全审查 |\n| {r['iot_security']} | 嵌入式安全审查 |"
         if info["has_hardware"]
-        else "| 张三丰 | 部署联调 infra/ |\n| 一灯大师 | 平台安全审查 |"
+        else f"| {r['devops']} | 部署联调 infra/ |\n| {r['security']} | 平台安全审查 |"
     )
 
     eng_pattern = (
-        "乔峰|黄蓉|张三丰|杨过" if info["has_hardware"] else "乔峰|黄蓉|张三丰"
+        f"{r['backend']}|{r['frontend']}|{r['devops']}|{r['hardware']}"
+        if info["has_hardware"]
+        else f"{r['backend']}|{r['frontend']}|{r['devops']}"
     )
     review_pattern = (
-        "王重阳|一灯大师|郭靖" if info["has_hardware"] else "王重阳|一灯大师"
+        f"{r['architect']}|{r['security']}|{r['iot_security']}"
+        if info["has_hardware"]
+        else f"{r['architect']}|{r['security']}"
     )
     all_roles = (
-        "乔峰 黄蓉 张三丰 杨过 王重阳 一灯大师 郭靖"
+        f"{r['backend']} {r['frontend']} {r['devops']} {r['hardware']} {r['architect']} {r['security']} {r['iot_security']}"
         if info["has_hardware"]
-        else "乔峰 黄蓉 张三丰 王重阳 一灯大师"
+        else f"{r['backend']} {r['frontend']} {r['devops']} {r['architect']} {r['security']}"
     )
 
     return {
@@ -377,4 +388,14 @@ def _build_variables(info: dict) -> dict:
         "eng_pattern": eng_pattern,
         "review_pattern": review_pattern,
         "all_roles": all_roles,
+        "team_name": team_name,
+        # 角色名模板变量
+        "role_owner": r["owner"],
+        "role_architect": r["architect"],
+        "role_frontend": r["frontend"],
+        "role_backend": r["backend"],
+        "role_devops": r["devops"],
+        "role_hardware": r["hardware"],
+        "role_security": r["security"],
+        "role_iot_security": r["iot_security"],
     }

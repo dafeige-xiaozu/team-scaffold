@@ -24,7 +24,7 @@ description: "触发嵌入式与物联网安全审查"
 ```bash
 git diff --name-only HEAD -- hardware/
 ```
-然后逐文件审查，按照郭靖的输出格式给出 findings。
+然后逐文件审查，按照{{role_iot_security}}的输出格式给出 findings。
 
 ## 输出要求
 - 每个问题按「严重级别 / 问题位置 / 问题描述 / 可能影响 / 修复建议」输出

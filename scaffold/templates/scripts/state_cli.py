@@ -5,7 +5,7 @@
 用法：
     python scripts/state_cli.py team-status
     python scripts/state_cli.py decisions
-    python scripts/state_cli.py decision-propose --title "用 Redis 做缓存" --proposed-by "乔峰"
+    python scripts/state_cli.py decision-propose --title "用 Redis 做缓存" --proposed-by "{{role_backend}}"
     python scripts/state_cli.py decision-lock DEC-003
 """
 import argparse

@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # /recent-changes
 
-查看最近的代码变更，帮助王重阳了解项目当前状态。
+查看最近的代码变更，帮助{{role_architect}}了解项目当前状态。
 
 ## 执行
 ```bash

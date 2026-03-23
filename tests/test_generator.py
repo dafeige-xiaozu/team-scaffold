@@ -205,7 +205,7 @@ class TestGenerateFiles:
         assert "这是一个测试" in content
 
     def test_version(self):
-        assert __version__ == "5.0.0"
+        assert __version__ == "6.0.0"
 
     def test_force_overwrite(self, base_info, tmp_path):
         """--force should overwrite existing files."""

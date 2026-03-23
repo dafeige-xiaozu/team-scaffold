@@ -11,7 +11,7 @@ while read local_ref local_sha remote_ref remote_sha; do
         # 检查本地提交是否包含远程 HEAD，不包含说明是 force push
         if ! git merge-base --is-ancestor "$remote_sha" "$local_sha" 2>/dev/null; then
             echo "❌ 检测到 non-fast-forward push（疑似 force push），阻止推送" >&2
-            echo "   如果确实需要，请联系大飞哥确认" >&2
+            echo "   如果确实需要，请联系{{role_owner}}确认" >&2
             exit 1
         fi
     fi
