@@ -1,5 +1,5 @@
 {
-  "version": "5.0.0",
+  "version": "6.0.0",
   "files": [
     {"output": "CLAUDE.md", "template": "root/CLAUDE.md"},
     {"output": "DECISIONS.md", "template": "root/DECISIONS.md"},
@@ -26,6 +26,8 @@
     {"output": ".claude/rules/07-pitfall-registry.md", "template": "claude/rules/07-pitfall-registry.md"},
     {"output": ".claude/rules/backend-api.md", "template": "claude/rules/backend-api.md"},
     {"output": ".claude/rules/frontend-ui.md", "template": "claude/rules/frontend-ui.md"},
+    {"output": ".claude/rules/frontend-state.md", "template": "claude/rules/frontend-state.md"},
+    {"output": ".claude/rules/integration-checklist.md", "template": "claude/rules/integration-checklist.md"},
 
     {"output": ".claude/skills/team-status/SKILL.md", "template": "claude/skills/team-status.md"},
     {"output": ".claude/skills/decision/SKILL.md", "template": "claude/skills/decision.md"},
