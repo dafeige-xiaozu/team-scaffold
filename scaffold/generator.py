@@ -326,6 +326,21 @@ def generate_files(info: dict) -> dict:
     return files
 
 
+def _build_role_mapping_json(roles: dict, has_hardware: bool) -> str:
+    """构建角色名→状态目录的 JSON 字符串，用于 shell 模板中安全传递给 Python。"""
+    mapping = {
+        roles["architect"]: "architect",
+        roles["backend"]: "backend",
+        roles["frontend"]: "frontend",
+        roles["devops"]: "infra",
+        roles["security"]: "security",
+    }
+    if has_hardware:
+        mapping[roles["hardware"]] = "hardware"
+        mapping[roles["iot_security"]] = "iot-security"
+    return json.dumps(mapping, ensure_ascii=False)
+
+
 def _build_variables(info: dict) -> dict:
     """从 info 构建模板变量字典。"""
     ip = info["server_ip"]
@@ -398,4 +413,6 @@ def _build_variables(info: dict) -> dict:
         "role_hardware": r["hardware"],
         "role_security": r["security"],
         "role_iot_security": r["iot_security"],
+        # JSON 序列化的角色映射，避免在 shell 模板中拼 Python 字符串导致注入
+        "role_mapping_json": _build_role_mapping_json(roles, info["has_hardware"]),
     }

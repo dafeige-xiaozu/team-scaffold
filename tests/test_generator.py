@@ -257,6 +257,28 @@ class TestGenerateFiles:
         protocol = files[".claude/rules/00-team-protocol.md"][0]
         assert "杨过" in protocol
 
+    def test_single_quote_in_role_name(self, base_info):
+        """角色名含单引号时，生成的 on-session-start.sh 中 Python 代码语法正确。"""
+        base_info["roles"] = {
+            "owner": "老王's",
+            "architect": "王重阳's",
+            "frontend": "黄蓉",
+            "backend": "老王's",
+            "devops": "张三丰",
+            "hardware": "杨过",
+            "security": "一灯大师",
+            "iot_security": "郭靖",
+        }
+        files = generate_files(base_info)
+        hook_content = files[".claude/hooks/on-session-start.sh"][0]
+        # 提取 heredoc 中的 Python 代码
+        import re
+        m = re.search(r"<<'PYEOF'\n(.*?)\nPYEOF", hook_content, re.DOTALL)
+        assert m, "on-session-start.sh 中找不到 PYEOF heredoc 代码块"
+        py_code = m.group(1)
+        # 验证 Python 语法正确
+        compile(py_code, "<on-session-start>", "exec")
+
     def test_template_variables_not_leaked(self, base_info):
         """Ensure no unresolved {{variable}} patterns remain (except intentional ones)."""
         files = generate_files(base_info)

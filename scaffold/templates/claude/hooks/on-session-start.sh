@@ -10,19 +10,12 @@ command -v python3 >/dev/null 2>&1 || { echo "python3 not found, skipping hook";
 AGENT_NAME="${CLAUDE_AGENT_NAME:-unknown}"
 
 # 角色名 → 状态文件目录映射
-STATUS_KEY=$(python3 -c "
-mapping = {
-    '{{role_architect}}': 'architect',
-    '{{role_backend}}': 'backend',
-    '{{role_frontend}}': 'frontend',
-    '{{role_devops}}': 'infra',
-{{#has_hardware}}    '{{role_hardware}}': 'hardware',
-{{/has_hardware}}    '{{role_security}}': 'security',
-{{#has_hardware}}    '{{role_iot_security}}': 'iot-security',
-{{/has_hardware}}
-}
-print(mapping.get('${AGENT_NAME}', 'unknown'))
-")
+STATUS_KEY=$(python3 - "${AGENT_NAME}" <<'PYEOF'
+import json, sys
+mapping = json.loads("""{{role_mapping_json}}""")
+print(mapping.get(sys.argv[1], 'unknown'))
+PYEOF
+)
 
 echo "=== 会话启动 ==="
 echo "角色: ${AGENT_NAME}"
